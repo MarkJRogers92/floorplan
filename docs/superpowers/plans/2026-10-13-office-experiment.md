@@ -38,4 +38,4 @@
 - [x] Demo mode lifecycle/zero-network policy/replay cancellation tests RED→GREEN; main integration/generation guard, optional?demo=1 offline preview.
 - [x] Actual demo screenshots via installedChromeisolatedprofile, inspect1x/2x/desktop/narrow; actual synthetic live job controls, regression counts; fix observed issues.
 - [x] Independent cross-family wholefeature review, full suite/typecheck/build/privacy/diffcheck, docs. Report models/limits honestly.
-- [ ] Owner-authorized integration/publication and fresh merged tests; no automatic push.
+- [x] Owner authorised pull/merge/push; integrated into main with fresh merged checks.

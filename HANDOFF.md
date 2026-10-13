@@ -343,7 +343,9 @@ has documented manual setup rather than an npm shortcut. Reviewer declined tiny2
 canvas/taste/letterbox judgments: integer1x art clips below320px,6 actors still counted,
 and restrained first-pass letterboxing is intentional; upgrade only if needed.
 Reviewer's location-wire concern was resolved by the actual validated read, not guessed.
-Kept on local `office-experiment`; publication/integration is a separate owner decision.
+Owner authorised “push, merge & pull” after review. The office experiment is now merged
+into `main` by fast-forward after pulling current origin/main; no unrelated branch or
+sibling checkout is changed. The feature branch is retained rather than deleted.
 
 Before extending episode lifecycle, read the slice-2 execution notes;
 that plan's original timeout contradicted D2 and was not implemented.

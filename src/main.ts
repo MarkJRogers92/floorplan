@@ -49,17 +49,17 @@ async function seedFromREST(service: Service) {
   ])
 
   if (!sessionsRes.ok) throw new Error(`sessions returned ${sessionsRes.status}`)
-  const sessions = await sessionsRes.json()
+  const sessions = (await sessionsRes.json()).data ?? []
 
   const permissions = permissionsRes.ok
-    ? (await permissionsRes.json()).map((r: { id: string; sessionID: string }) => ({
+    ? ((await permissionsRes.json()).data ?? []).map((r: { id: string; sessionID: string }) => ({
         requestID: r.id,
         sessionID: r.sessionID,
       }))
     : []
 
   const forms = formsRes.ok
-    ? (await formsRes.json()).map((f: { id: string; sessionID: string }) => ({
+    ? ((await formsRes.json()).data ?? []).map((f: { id: string; sessionID: string }) => ({
         requestID: f.id,
         sessionID: f.sessionID,
       }))

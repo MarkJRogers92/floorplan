@@ -9,23 +9,25 @@ live in. The design and the plan that is being executed both live in `docs/`.
 
 ## What exists today
 
-The data path, and nothing visual yet:
+A live room of desks drawn from real OpenCode state:
 
 - reading OpenCode's service file (`src/api/service.ts`)
 - one authenticated API client every call goes through (`src/api/client.ts`)
 - a server-sent-event parser that survives frames split across chunks (`src/api/sse.ts`)
+- a room that draws one desk per session, live from `/api/event` or from a `.jsonl` recording
 
-No room, no rail, no permissions, no art, no font. See the plan for the order.
+The rail, the narrative script panel, and automatic permission-answering are deliberately not built yet. See the plan for the order.
 
 ## Running it
 
 ```sh
 bun install
+bun run dev         # start the Vite dev server and open the room
 bun run test        # vitest
 bun run typecheck   # tsc --noEmit
 ```
 
-Both must pass before any change is committed.
+`bun run test` and `bun run typecheck` must both pass before any change is committed.
 
 ## How it relates to OpenCode
 

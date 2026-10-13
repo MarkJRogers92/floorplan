@@ -36,5 +36,5 @@ export function bindReplayControls(replay: HTMLButtonElement, input: HTMLInputEl
     const file = input.files?.[0]
     replay.textContent = file ? `Replay ${file.name}` : 'Replay'
   })
-  return { current }
+  return { current, cancel: () => { generation++ } }
 }

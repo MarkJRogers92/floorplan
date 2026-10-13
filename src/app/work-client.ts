@@ -84,6 +84,12 @@ export function createWorkClient(service: Service, request: typeof authedFetch =
     })
   }
 
+  const currentProject = async (): Promise<WorkProject> => {
+    const body = await json(await send('/api/location'))
+    if (!isRecord(body) || !isDirectory(body.directory)) return refuse()
+    return { directory: body.directory, label: body.directory.split('/').filter(Boolean).at(-1) ?? 'Computer root' }
+  }
+
   const agents = async (directory: string): Promise<WorkAgent[]> => {
     if (!isDirectory(directory)) return bad('project directory')
     const body = await json(await send(`/api/agent?location[directory]=${encodeURIComponent(directory)}`))
@@ -190,5 +196,5 @@ export function createWorkClient(service: Service, request: typeof authedFetch =
     return body.interrupted
   }
 
-  return { projects, agents, create, session, prompt, messages, permissions, reply, stop }
+  return { projects, currentProject, agents, create, session, prompt, messages, permissions, reply, stop }
 }

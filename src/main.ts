@@ -10,6 +10,7 @@ import { scriptRow, memoryElement, recapElement } from './app/script-view'
 import { castMemoryCards } from './app/cast-memory'
 import { mountWorkPanel } from './app/work-panel'
 import { bindReplayControls } from './app/replay-controls'
+import { createDemoPlayer } from './app/demo'
 import { beatsForWork } from './app/work-scope'
 import { scopeFromSnapshot, seriesKeyForRoot } from './narrative/scope'
 import { rootFor } from './narrative/cast'
@@ -21,7 +22,10 @@ import { assembleEpisodeViews } from './narrative/views'
 import { createRoom } from './room/room'
 import { createStageRuntime } from './room/stage'
 
-const toolbar = document.getElementById('toolbar')!
+const welcome = document.getElementById('welcome')!
+const liveBtn = document.getElementById('live') as HTMLButtonElement
+const demoBtn = document.getElementById('demo') as HTMLButtonElement
+const modeNotice = document.getElementById('mode-notice')!
 const status = document.getElementById('status')!
 const canvas = document.getElementById('canvas') as HTMLCanvasElement
 const replayBtn = document.getElementById('replay') as HTMLButtonElement
@@ -43,6 +47,7 @@ const room = createRoom(canvas, workerImage)
 const stage = createStageRuntime()
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
 let lastStageBeat: Beat | undefined
+let stageLine = ''
 let liveAbort: AbortController | null = null
 
 function draw() {
@@ -52,11 +57,13 @@ function draw() {
     return !replaying && selected ? root === selected : observedRoots.has(root)
   })
   const frames = stage.frames(performance.now(), reducedMotion.matches)
-  room.draw(desks, frames)
+  welcome.hidden = replaying || !!selected || desks.length > 0
+  room.draw(desks, frames, new Map([...rollState.sessions.values()].map(s => [s.id, s.agent ?? 'Unidentified'])))
+  canvas.setAttribute('aria-label', desks.length ? desks.map(d => `${rollState.sessions.get(d.sessionID)?.agent ?? 'Unidentified'}: ${d.status}`).join('; ') : 'An empty office. No active cast observed.')
   const actor = lastStageBeat && 'childSessionID' in lastStageBeat.detail ? lastStageBeat.detail.childSessionID : lastStageBeat?.sessionID
   const frame = actor ? frames.get(actor) : undefined
   const visible = frame && desks.some(d => d.sessionID === frame.sessionID) && frame.beatID === lastStageBeat?.id
-  const label = visible ? `${frame.kind} — dramatised reaction · ${frame.beatID}` : 'Dramatised reactions; desk colours show real states.'
+  const label = visible && stageLine ? `${stageLine} · dramatised` : desks.length ? 'Office reactions are dramatised. Desk labels show the actual state.' : 'The desks are ready. The coffee is theoretical.'
   const session = visible ? frame.sessionID : ''
   if (stageCue.textContent !== label || stageCue.dataset.session !== session) {
     stageCue.textContent = label
@@ -70,19 +77,12 @@ function setStatus(text: string, isError = false) {
   status.classList.toggle('error', isError)
 }
 
-/**
- * The narrative consumer: the same frames the floor folds, run through the rollup
- * (§4.1) and assembled into the script (§5.1). It never blocks the floor — a beat it
- * cannot narrate is dropped, and the floor carries on.
- *
- * The cast is rebuilt from the rollup's own sessions, so a worker's name is the one the
- * stream gave it (§5.5), never a guess.
- */
 let rollState = seedRollup(createRollup(), { sessions: [], permissions: [] })
 let beats: Beat[] = []
 let observedRoots = new Set<string>()
 let narrativeFlushed = false
 let replaying = false
+let demoMode = false
 let directorEnabled = false
 let directorState: DirectorState | null = null
 const excludedChats = new Set<string>()
@@ -97,36 +97,42 @@ const director = createDirectorRuntime((request, signal) => directorCall('scene'
 })
 
 function directorControls() {
-  directorBtn.disabled = !directorState?.available
+  directorBtn.disabled = demoMode || !directorState?.available
   directorBtn.textContent = directorEnabled ? 'Disable Director' : 'Enable Director (sends scenes to OpenAI)'
   directorStatus.textContent = !directorState?.available ? 'Director: templates (not configured)' :
     `Director: ${directorEnabled ? 'on' : 'off'} · ${directorState.reservedCents}¢ reserved / ${directorState.runCapCents}¢ run cap`
 }
 
 async function refreshDirectorState() {
+  if (demoMode) return
+  const current = playback.current()
   try {
     const state = parseDirectorState(await directorCall('state'))
+    if (!current() || demoMode) return
     if (!state) throw new Error('Director unavailable')
     directorState = state
     for (const root of state.excluded) { excludedChats.add(root); director.setExcluded(root, true) }
     if (!state.enabled || !state.available) { directorEnabled = false; director.setEnabled(false) }
-  } catch { directorState = null; directorEnabled = false; director.setEnabled(false) }
+  } catch { if (!current() || demoMode) return; directorState = null; directorEnabled = false; director.setEnabled(false) }
   directorControls()
   renderNarrative()
 }
 
 directorBtn.addEventListener('click', async () => {
+  if (demoMode) return
+  const current = playback.current()
   const enable = !directorEnabled
   if (!enable) { directorEnabled = false; director.setEnabled(false); renderNarrative() }
   directorBtn.disabled = true
   try {
     const state = parseDirectorState(await directorCall('control', { enabled: enable }))
+    if (!current() || demoMode) return
     if (!state) throw new Error('Director unavailable')
     directorState = state
     for (const root of state.excluded) { excludedChats.add(root); director.setExcluded(root, true) }
     directorEnabled = enable && state.available && state.enabled
     director.setEnabled(directorEnabled)
-  } catch { directorState = null; directorEnabled = false; director.setEnabled(false) }
+  } catch { if (!current() || demoMode) return; directorState = null; directorEnabled = false; director.setEnabled(false) }
   directorControls()
   renderNarrative()
 })
@@ -137,8 +143,10 @@ function chatOptOut(root: string) {
   const checkbox = document.createElement('input')
   checkbox.type = 'checkbox'
   checkbox.checked = excludedChats.has(root)
-  checkbox.disabled = !directorState?.available
+  checkbox.disabled = demoMode || !directorState?.available
   checkbox.addEventListener('change', async () => {
+    if (demoMode) return
+    const current = playback.current()
     const disabled = checkbox.checked
     if (disabled) excludedChats.add(root)
     else excludedChats.delete(root)
@@ -146,9 +154,10 @@ function chatOptOut(root: string) {
     renderNarrative()
     try {
       const state = parseDirectorState(await directorCall('opt-out', { rootSessionID: root, disabled }))
+      if (!current() || demoMode) return
       if (!state) throw new Error('Director unavailable')
       directorState = state
-    } catch { directorEnabled = false; director.setEnabled(false) }
+    } catch { if (!current() || demoMode) return; directorEnabled = false; director.setEnabled(false) }
     directorControls()
     renderNarrative()
   })
@@ -161,6 +170,7 @@ function resetNarrative() {
   history.reset()
   recaps.reset()
   stage.reset(); lastStageBeat = undefined
+  floor.setSnapshot([], [])
   rollState = seedRollup(createRollup(), { sessions: [], permissions: [] })
   beats = []
   observedRoots.clear()
@@ -173,11 +183,16 @@ function narrate(arrived: Beat[], flushed = false) {
   beats.push(...arrived)
   observedRoots = new Set(beats.map(b => rootFor(b.sessionID, rollState.sessions)))
   stage.update(arrived, performance.now())
-  if (arrived.length) lastStageBeat = arrived[arrived.length - 1]
+  if (arrived.length) {
+    lastStageBeat = arrived[arrived.length - 1]
+    stageLine = assembleEpisodeViews([lastStageBeat!], [...rollState.sessions.values()]).flatMap(v => v.scenes.flatMap(s => s.lines)).at(-1)?.text ?? ''
+  }
   if (flushed) narrativeFlushed = true
-  history.update(beats, [...rollState.sessions.values()], replaying)
-  historyStatus.textContent = history.status()
-  recaps.update(beats, [...rollState.sessions.values()], replaying)
+  if (!demoMode) {
+    history.update(beats, [...rollState.sessions.values()], replaying)
+    historyStatus.textContent = history.status()
+    recaps.update(beats, [...rollState.sessions.values()], replaying)
+  }
   renderNarrative()
 }
 
@@ -187,13 +202,13 @@ function renderNarrative() {
   const sessions = [...rollState.sessions.values()]
   const index = rollState.sessions
   const focused = beatsForWork(beats, index, work.selectedID(), replaying)
-  director.update(focused, sessions, narrativeFlushed, !replaying)
+  if (!demoMode) director.update(focused, sessions, narrativeFlushed, !replaying)
   const content = document.createDocumentFragment()
   for (const view of assembleEpisodeViews(focused, sessions, director.results())) {
     const episode = document.createElement('section')
     episode.dataset.episode = view.episode.id
     episode.append(scriptRow(view.heading, 'episode'))
-    episode.append(chatOptOut(view.episode.rootSessionID))
+    if (!demoMode) episode.append(chatOptOut(view.episode.rootSessionID))
     const root = view.episode.rootSessionID
     const key = seriesKeyForRoot(root, sessions)
     if (!replaying && key) {
@@ -226,7 +241,7 @@ function renderNarrative() {
     content.append(episode)
   }
   scriptEl.replaceChildren(content)
-  if (!scriptEl.childElementCount) scriptEl.textContent = 'Start a job above, or select an existing job. New activity appears here; saved messages are in Real conversation.'
+  if (!scriptEl.childElementCount) scriptEl.textContent = 'Quiet, for now. Give your lead a brief below, or watch the demo. The office will have opinions.'
   scriptEl.scrollTop = scriptEl.scrollHeight
 }
 
@@ -236,7 +251,7 @@ function pushFrame(frame: Frame) {
   const folded = rollFrame(rollState, frame)
   rollState = folded.state
   if (folded.beats.length || priorSessions !== rollState.sessions) narrate(folded.beats)
-  work.push(frame)
+  if (!demoMode) work.push(frame)
   draw()
 }
 
@@ -279,8 +294,6 @@ async function seedFromREST(service: Service, current = () => true) {
   floor.setSnapshot(sessions, requests)
   work.updateSessions(sessions)
   work.updateQuestions(rawForms)
-  // Seed the narrative the same way (§4.1): a session we joined mid-turn still has a
-  // root and a cast member. Sessions without a parentID on the wire are taken for roots.
   rollState = seedRollup(rollState, {
     sessions: sessions.map((s: { id: string; parentID?: string; agent?: string }) => ({
       id: s.id,
@@ -312,6 +325,7 @@ async function startLive(service: Service) {
 async function connect(service: Service, current = () => true) {
   liveAbort?.abort()
   replaying = false
+  setDemoMode(false)
   resetNarrative()
   work.connect(service)
   await seedFromREST(service, current)
@@ -329,14 +343,32 @@ async function start() {
   }
 }
 
-const playback = bindReplayControls(replayBtn, fileInput, document.getElementById('live') as HTMLButtonElement, {
-  enterReplay() { liveAbort?.abort(); replaying = true; work.setReplay(true); resetNarrative(); draw() },
+const demo = createDemoPlayer(pushFrame, () => { narrate(flushRollup(rollState), true); setStatus('Demo finished — fictional') })
+function setDemoMode(enabled: boolean) {
+  demo.cancel(); demoMode = enabled
+  document.body.dataset.mode = enabled ? 'demo' : 'live'
+  modeNotice.hidden = !enabled; liveBtn.hidden = !replaying
+  demoBtn.textContent = enabled ? 'Restart demo' : 'Watch demo'
+  if (enabled) { directorEnabled = false; director.setEnabled(false) }
+  directorControls()
+}
+function playDemo() {
+  playback.cancel(); liveAbort?.abort(); replaying = true
+  setDemoMode(true); work.setReplay(true, true); resetNarrative()
+  historyStatus.textContent = 'Demo: no local history'
+  setStatus('Demo — fictional'); renderNarrative(); draw(); demo.play()
+}
+demoBtn.addEventListener('click', playDemo)
+document.getElementById('demo-welcome')!.addEventListener('click', playDemo)
+const playback = bindReplayControls(replayBtn, fileInput, liveBtn, {
+  enterReplay() { liveAbort?.abort(); replaying = true; setDemoMode(false); work.setReplay(true); resetNarrative(); draw() },
   push: pushFrame,
   finish: () => narrate(flushRollup(rollState), true),
   status: setStatus,
   async returnLive(current) {
     const service = await fetchService(current)
     if (service && current()) await connect(service, current)
+    if (current() && !demoMode) void refreshDirectorState()
   },
 })
 
@@ -350,8 +382,8 @@ function resize() {
 window.addEventListener('resize', resize)
 document.addEventListener('toggle', resize, true)
 resize()
-start()
-void refreshDirectorState()
+if (new URLSearchParams(location.search).get('demo') === '1') playDemo()
+else { document.body.dataset.mode = 'live'; start(); void refreshDirectorState() }
 
 // Keep the canvas in sync with state changes that no frame announces, such as the
 // success/failure hold falling back to idle after a timer.

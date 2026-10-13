@@ -7,6 +7,7 @@ const tick = async () => { for (let i = 0; i < 30; i++) await Promise.resolve() 
 function boundary(patch: Record<string, unknown> = {}) {
   return {
     projects: async () => [{ directory, label: 'Project' }],
+    currentProject: async () => ({ directory, label: 'Project' }),
     agents: async () => [{ id: 'build', name: 'Build', model: 'synthetic/model' }],
     create: async () => session(), session: async (id: string) => session(id),
     prompt: async (_session: string, _text: string, _id: string) => {},

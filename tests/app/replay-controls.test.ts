@@ -50,3 +50,12 @@ it('choosing replay without a file does not enter replay or cancel live work', (
   replay.click()
   expect([entered, errors, current()]).toEqual([0, 1, true])
 })
+it('starting an offline demo invalidates a pending startup/live or file-playback generation', async () => {
+  const replay = control(), live = control(), input = { files: [], addEventListener: () => {} }
+  const gate = bindReplayControls(replay as unknown as HTMLButtonElement, input as unknown as HTMLInputElement, live as unknown as HTMLButtonElement, {
+    enterReplay: () => {}, push: () => {}, finish: () => {}, status: () => {}, returnLive: async () => {},
+  })
+  const pending = gate.current()
+  gate.cancel()
+  expect(pending()).toBe(false)
+})

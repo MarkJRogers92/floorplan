@@ -289,9 +289,62 @@ rewrites message IDs was disproved by the controlled real nonexecuting probe: ex
 temp-folder/agent preserved, caller ID/text/delivery echoed, duplicate200 leaves1 queued
 input, cost0, idle interruptfalse. No executing prompt/model acceptance call, no private
 recordings/keys submitted to workers. Synthetic-page assertions prove the full UI wire
-flow; whole-page screenshots/keyboard operation remain unverified because its browser
-window was hidden. Actual participants: Sol integration, DeepSeekAPI client, Space Bunny
+flow; screenshots/keyboard were unverified at this milestone (the office pass below now
+adds actual isolated-Chrome coverage). Actual participants: Sol integration, DeepSeekAPI client, Space Bunny
 independent review. See `docs/work.md` for limits and the retained nonexecuting probe chat.
+**Office experiment follow-up:** owner explicitly delegated design calls (“fun little
+experiment like munder difflin”) after rejecting the control-panel UX. The new spec
+`docs/superpowers/specs/2026-10-13-office-experiment-design.md` supersedes script-first
+presentation and permits ONLY an explicitly fictional, API/archive-isolated onboarding
+demo. Original procedural room, warm paper UI, one composer, friendly project names;
+lead defaults only to eligible configured build in the validated visible server folder.
+Details/real conversation/replay/Director live in settings, but approvals and Stop stay
+visible. New brief preserves draft and doesn't stop an earlier job. No copied assets,
+dependencies, router or provider acceptance calls; worker.png/source remain unchanged.
+Aseprite preflight was unattached, so no sprite-file or headless fallback occurred.
+
+Watch demo runs the unchanged fold/check/stage pipeline with synthetic canonical frames
+and scripted cited quotes, persistent fiction banner, no service/Director/history/engine
+calls. `?demo=1` works offline. Starting/restarting/leaving invalidates old delivery,
+REST and Director-control generations; no old opt-in can re-enable narration after
+return. Demo disables Director locally, not via a global server-control write. Real jobs
+may continue behind replay; entering demo does not refund a previously sent paid call.
+Six actual stations maximum, overflow counted, textual states/Canvas accessible label.
+Mobile uses1x art; desktop normally2x. This is a first-pass room, not a complete cast.
+
+Current verification591 tests/58 files, typecheck/build/diff check pass. Existing Vite
+native-config-loader extension warning persists. Real isolated headless Chrome screenshot
+review at1440px/390px and keyboard typing/Tab/Enter admission were exercised against
+synthetic API boundaries, with no models or file work. Durable browser harness:
+`tests/browser/office-check.mjs` (see docs/work.md). It covers zero-IO offline/restarted/full
+demo, delayed enabled Director, late pre-demo opt-in discarded after return, visible
+approval with settings closed, create/prompt/restored project/default build, New brief
+and draft, interrupted startup metadata recovery, no horizontal overflow. Participants:
+Sol integration/visual QA; DeepSeek V4.1 Flash API bounded renderer/demo implementation.
+Independent Space Bunny Free review ran590 tests/typecheck/build and the actual browser
+harness; its four Important findings were fixed RED→GREEN in one pass: overflow note
+no longer collides with station6 status, stage captions explicitly say dramatised,
+phone composer notices take a full row, failed reconnect leaves demo playback alive
+with visible connection errors. Fresh final suite591/58 and browser harness pass; bundle
+contains no server-only provider/config/archive markers. A real GET-only metadata check
+also confirmed current location is a validated non-root directory and three eligible
+leads include build; zero writes/models. MiniMax Go review was unavailable (usage limit),
+so approved public/synthetic-only Space Bunny performed the review. No private archives,
+recordings, config, keys or service credentials were submitted to contributor workers.
+
+Deferred review minors (no safety/data/spend blocker): offline demo lead subtitle remains
+generic before a runtime exists; pending real approvals are hidden until Return-live
+without a separate reminder (the demo/replay banner says jobs continue); default-folder
+read failures fall back to explicit setup without special error copy; the lead subtitle
+is hidden on phones (connection status was restored in the Important fix); Canvas aria
+labels are rewritten each RAF; same-name projects sharing parent basename may still
+have matching friendly labels (exact path remains the value/tooltip); browser harness
+has documented manual setup rather than an npm shortcut. Reviewer declined tiny200px
+canvas/taste/letterbox judgments: integer1x art clips below320px,6 actors still counted,
+and restrained first-pass letterboxing is intentional; upgrade only if needed.
+Reviewer's location-wire concern was resolved by the actual validated read, not guessed.
+Kept on local `office-experiment`; publication/integration is a separate owner decision.
+
 Before extending episode lifecycle, read the slice-2 execution notes;
 that plan's original timeout contradicted D2 and was not implemented.
 The same notes record final review rulings and deferred minors. In particular,
@@ -310,7 +363,8 @@ success first and falls back to the join.
 a chat is an episode and a project is a series; the unseen audience is not a character;
 Director calls use an opt-in separate key through the dev route, provider/code spending
 caps and per-session opt-out; files hold series continuity; no season numbering;
-script first, floor alongside. A resumed chat never becomes a made-up Part Two.
+Office-first now supersedes script-first under the later office-experiment spec.
+A resumed chat never becomes a made-up Part Two.
 
 ## If you are a different harness
 

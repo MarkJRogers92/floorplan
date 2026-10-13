@@ -30,8 +30,8 @@ describe('readService', () => {
     const dir = mkdtempSync(join(tmpdir(), 'svc-'))
     const p = join(dir, 'service.json')
     writeFileSync(p, JSON.stringify({ url: 5, password: 'SUPERSECRET' }))
-    try { readService(p) } catch (e) {
-      expect(String((e as Error).message)).not.toContain('SUPERSECRET')
-    }
+    const err = (() => { try { readService(p); return null } catch (e) { return e as Error } })()
+    expect(err).not.toBeNull()
+    expect(String(err!.message)).not.toContain('SUPERSECRET')
   })
 })

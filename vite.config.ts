@@ -4,6 +4,8 @@ import { createServiceHandler } from './src/dev/service-route'
 import { createDirectorHandler } from './src/dev/director-route'
 import { createDirectorService, directorConfig } from './src/dev/director-service'
 import { createDirectorProvider } from './src/dev/director-provider'
+import { createSeriesStore } from './server/series-store'
+import { createSeriesHandler } from './src/dev/series-route'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -18,6 +20,7 @@ export default defineConfig(({ mode }) => ({
         server.middlewares.use('/__service', createServiceHandler(readService))
         const config = directorConfig(loadEnv(mode, '.', 'FLOORPLAN_DIRECTOR_'))
         server.middlewares.use('/__director', createDirectorHandler(createDirectorService(config, createDirectorProvider(config.key))))
+        server.middlewares.use('/__series', createSeriesHandler(createSeriesStore()))
       },
     },
   ],

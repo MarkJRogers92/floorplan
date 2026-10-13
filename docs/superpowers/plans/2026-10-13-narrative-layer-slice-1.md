@@ -92,12 +92,10 @@ describe('dedupe — a reconnect replays frames we have already seen', () => {
     expect(asked.beats.map(x => x.kind)).toEqual(['human-asks'])
   })
 
-  it('produces no beat for any of the frame types §4.1 absorbs', () => {
+  it('produces no beat for the frame types §4.1 absorbs and that nothing here handles', () => {
     const absorbed = [
-      'tool.input.delta', 'tool.input.ended', 'tool.called', 'tool.progress',
-      'reasoning.delta', 'text.delta', 'step.started', 'step.ended', 'step.streamed',
-      'usage.updated', 'shell.created', 'shell.exited', 'shell.deleted',
-      'inbox.delivered', 'execution.started', 'instructions.updated', 'project.updated',
+      'step.started', 'step.ended', 'step.streamed', 'usage.updated',
+      'inbox.delivered', 'instructions.updated', 'project.updated',
       'provider.updated', 'model.updated', 'server.connected',
     ]
     const s = seedRollup(createRollup(), { sessions: [{ id: 'x' }], permissions: [] })
@@ -221,7 +219,7 @@ Dedupe on `frame.id` **before** anything else and before recording it as seen. `
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `bun run test tests/narrative/rollup.test.ts`
-Expected: PASS, 12 tests
+Expected: PASS, 15 tests
 
 - [ ] **Step 5: Commit**
 
@@ -385,7 +383,7 @@ Calls: key by the call's `id`. `input.started` carries `name`; `called` and `pro
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `bun run test tests/narrative/rollup-runs.test.ts`
-Expected: PASS, 9 tests
+Expected: PASS, 11 tests
 
 - [ ] **Step 5: Commit**
 
@@ -498,7 +496,7 @@ Track each session's last frame time and whether it is **working** — after `ex
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `bun run test tests/narrative/rollup-silence.test.ts`
-Expected: PASS, 5 tests
+Expected: PASS, 6 tests
 
 - [ ] **Step 5: Commit**
 
@@ -717,7 +715,7 @@ Then the free-text lint: reject a template containing a digit, a number word, an
 - [ ] **Step 5: Run test to verify it passes**
 
 Run: `bun run test tests/narrative/line.test.ts tests/narrative/cast.test.ts`
-Expected: PASS, 18 tests
+Expected: PASS, 19 tests
 
 - [ ] **Step 6: Commit**
 

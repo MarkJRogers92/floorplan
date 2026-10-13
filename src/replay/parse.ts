@@ -1,9 +1,10 @@
-import type { Frame } from '../api/sse'
+import { toFrame, type Frame } from '../api/sse'
 
 /**
  * Turn a recording's text into frames. Pure and browser-safe. Never throws on
  * content: blank lines, lines that do not parse (such as a final line cut off by a
- * kill mid-write) and lines without a string `type` are dropped, not fatal.
+ * kill mid-write) and lines without a string `type` are dropped, not fatal. Each line
+ * is normalised exactly as a live SSE payload is, so replay and live cannot disagree.
  */
 export function parseRecording(text: string): Frame[] {
   const frames: Frame[] = []
@@ -15,10 +16,8 @@ export function parseRecording(text: string): Frame[] {
     } catch {
       continue
     }
-    if (typeof value !== 'object' || value === null) continue
-    const { id, type, data } = value as Partial<Frame>
-    if (typeof type !== 'string') continue
-    frames.push(typeof id === 'string' ? { id, type, data } : { type, data })
+    const frame = toFrame(value)
+    if (frame) frames.push(frame)
   }
   return frames
 }

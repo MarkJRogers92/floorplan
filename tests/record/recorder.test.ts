@@ -26,3 +26,15 @@ describe('createRecorder', () => {
     expect(types).toEqual(['first', 'second'])
   })
 })
+
+describe('createRecorder — created and location', () => {
+  it('records created and location when the frame has them, and omits them when it does not', () => {
+    const f = tmpFile()
+    const write = createRecorder(f)
+    write({ id: 'e1', created: 5, type: 'a', location: { directory: '/x' }, data: {} })
+    write({ type: 'b', data: {} })
+    const [one, two] = readFileSync(f, 'utf8').trimEnd().split('\n').map(l => JSON.parse(l))
+    expect(one).toEqual({ id: 'e1', created: 5, type: 'a', location: { directory: '/x' }, data: {} })
+    expect(two).toEqual({ type: 'b', data: {} })
+  })
+})

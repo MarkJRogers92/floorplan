@@ -1,6 +1,25 @@
 // src/api/sse.ts
-/** One parsed SSE frame. OpenCode puts id/type/data inside the JSON payload. */
-export type Frame = { id?: string; type: string; data: unknown }
+/**
+ * One parsed SSE frame. OpenCode puts id/type/data inside the JSON payload, and on
+ * session frames also `created` (ms) and `location` (which project); the narrative
+ * layer needs both for timing and for grouping chats into a series.
+ */
+export type Frame = { id?: string; created?: number; type: string; location?: { directory?: string }; data: unknown }
+
+/** Normalise one decoded payload into a Frame, or undefined if it has no string type. */
+export function toFrame(payload: unknown): Frame | undefined {
+  if (typeof payload !== 'object' || payload === null) return undefined
+  const { id, created, type, location, data } = payload as Record<string, unknown>
+  if (typeof type !== 'string') return undefined
+  const frame: Frame = { type, data }
+  if (typeof id === 'string') frame.id = id
+  if (typeof created === 'number' && Number.isFinite(created)) frame.created = created
+  if (typeof location === 'object' && location !== null) {
+    const directory = (location as Record<string, unknown>).directory
+    if (typeof directory === 'string') frame.location = { directory }
+  }
+  return frame
+}
 
 /**
  * Split a buffer into whole frames. `\n\n` (an empty line) terminates an SSE
@@ -25,10 +44,8 @@ export function parseFrames(buffer: string): { frames: Frame[]; rest: string } {
     } catch {
       continue // not JSON: drop the frame rather than throw
     }
-    if (typeof payload !== 'object' || payload === null) continue
-    const { id, type, data } = payload as Partial<Frame>
-    if (typeof type !== 'string') continue
-    frames.push(typeof id === 'string' ? { id, type, data } : { type, data })
+    const frame = toFrame(payload)
+    if (frame) frames.push(frame)
   }
   return { frames, rest }
 }

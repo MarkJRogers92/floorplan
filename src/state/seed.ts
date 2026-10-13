@@ -18,8 +18,8 @@ export type PermissionRequest = { requestID: string; sessionID: string }
  *
  * Each open request is folded in as a synthetic `permission.asked` through the same
  * `applyFrame` the live stream uses, so a desk's state cannot depend on whether we
- * learned of its request from the snapshot or from an event. The reducer keeps the
- * first request a desk is asked, so "earliest" means first in the snapshot's order.
+ * learned of its request from the snapshot or from an event. The reducer keeps every
+ * request a desk is asked, so the snapshot's order only decides which is listed first.
  */
 export function seedDesks(sessions: SessionSnapshot[], permissions: PermissionRequest[]): Map<string, Desk> {
   const desks = new Map<string, Desk>()

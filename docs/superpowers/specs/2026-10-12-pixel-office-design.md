@@ -169,14 +169,24 @@ session's state does not depend on how we happened to learn about it.
 | `session.text.delta` | working |
 | `session.compaction.*` | working, caption "compacting" |
 | `permission.asked`, `form.created` | **waiting — needs you** |
-| `session.inbox.enqueued` | waiting, caption "waiting on another worker" — `.delivered` and `.cancelled` end that wait |
+| a parent whose child session (`session.created` with `parentID`) is busy | waiting, caption "waiting on another worker" |
+| `session.inbox.*` | no change — input arriving, not a wait (see note below the table) |
 | `session.execution.succeeded` | success, then settled by the caller |
 | `session.execution.failed` / `.interrupted` | failure, then settled by the caller |
 | `session.created` / `.deleted` | desk appears / is removed |
 
+*Amended 2026-10-13 by owner ruling.* This table first mapped `session.inbox.*` to
+"waiting on another worker". OpenCode v2's inbox items are `user`, `synthetic`,
+`compaction` and `move`, and every prompt passes through `inbox.enqueued`, so that
+row made every prompt flash the state while a parent really blocked on a subagent
+showed "working" (verified on a live recording). The wait now comes from the session
+tree: the registry links children by `parentID`, and a parent waits while any child
+is working or itself waiting. `execution.interrupted` with reason `shutdown` is idle,
+not failure, as in OpenCode's own reducer.
+
 Two states must never collapse into one: **"needs you"** and **"waiting on another
 worker"**. The reference project learned this the hard way and encodes it in a
-comment; a worker blocked on a sibling is not a worker that needs you.
+comment; a worker blocked on a child session is not a worker that needs you.
 
 **Precedence and clearing.** These rules are what stop a desk sticking:
 
@@ -187,7 +197,7 @@ comment; a worker blocked on a sibling is not a worker that needs you.
   the prompt in the TUI instead of our rail, and the event arrives either way. Write
   the clear path against the event, never against the UI action.
 - **"Needs you" outranks "waiting on another worker."** If both hold, show "needs
-  you"; the sibling wait is still true underneath and returns once the prompt is
+  you"; the wait on its subagent is still true underneath and returns once the prompt is
   answered — unless an activity frame has meanwhile put the desk back to `working`,
   which is correct, because it is working.
 - **A desk tracks every open request, not just the first.** The platform can hold more

@@ -39,3 +39,15 @@ describe('parseFrames', () => {
     expect(frames).toEqual([])
   })
 })
+
+describe('parseFrames — created and location (owner-approved, for the narrative layer)', () => {
+  it('keeps a numeric created and a location with a string directory', () => {
+    const p = JSON.stringify({ id: 'e1', created: 1700000000000, type: 't', location: { directory: '/x' }, data: {} })
+    const { frames } = parseFrames(`data: ${p}\n\n`)
+    expect(frames[0]).toEqual({ id: 'e1', created: 1700000000000, type: 't', location: { directory: '/x' }, data: {} })
+  })
+  it('omits them when absent or malformed, so old frames look exactly as before', () => {
+    const p = JSON.stringify({ created: 'soon', type: 't', location: 'here', data: {} })
+    expect(parseFrames(`data: ${p}\n\n`).frames[0]).toEqual({ type: 't', data: {} })
+  })
+})

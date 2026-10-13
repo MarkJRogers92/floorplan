@@ -68,8 +68,10 @@ built; they were deferred and are the remaining part of the spec's "done means".
 | `src/narrative/types.ts` | `Beat`, `BeatDetail`, `BeatKind`, cast and rollup state |
 | `src/narrative/line.ts`, `vocabulary.ts` | slots, the lint, delivery marks |
 | `src/narrative/templates.ts` | one template per beat kind, in the settled voice |
-| `src/narrative/cast.ts` | cast ids from sessions |
+| `src/narrative/cast.ts` | root resolution and cast ids, suffixed within each chat |
 | `src/narrative/script.ts` | beats to script lines, dropping rejected ones |
+| `src/narrative/scene.ts`, `episode.ts` | single-location scene cuts; one episode per root chat |
+| `src/narrative/check.ts`, `views.ts` | scene evidence checks and the pure episode view used by the page |
 | `src/room/{layout,room}.ts` | pure geometry, then canvas drawing |
 | `src/app/floor.ts` | `createFloor` — the object the page owns |
 | `src/main.ts`, `index.html` | the page — script primary column, floor panel beside it |
@@ -140,27 +142,39 @@ matter when they next come up:
 - **`?? []` on the seed unwrap silently swallows a shape regression** — the room would
   seed zero desks while still reading "live". An `Array.isArray` guard would make it loud.
 
-Never verified by anyone: **browser rendering and live SSE.** Everything green here is
-green against recordings and a `curl`, not against pixels. Run `bun run dev` with
-`opencode serve` and watch a desk appear — that is the cheapest way to retire it.
+**Browser verification (slice 2):** the actual page connected live to the local OpenCode
+server, then replayed the golden 204-frame recording to completion: one episode,
+twelve scenes, forty-four lines, zero checker failures, five explicit flashbacks.
+The failed shell exit, denied permission and forty-second gap remained visible in
+the DOM. Script and floor measured side by side, and the canvas contained drawn
+pixels. **Pixel-by-eye review remains unverified:** the desktop browser window was
+hidden and the screenshot tool refused capture. Hover/focus citation visibility also
+needs a visible-window check; citations are present in the DOM.
 
 ## Next
 
-**The narrative layer's slice 1 is built and merged** (6 tasks, 220 tests): the pure
-rollup with golden tests against a real recording, template lines with typed slots and
-the lint, and the script rendered as the primary column beside the floor. The Director,
-talking heads, recaps, titles, the §5.2 checker and §4.2 scene rules are deliberately
-not built — they are slice 2, and the design sequences the Director last on purpose.
+**The narrative layer's slice 1 is merged** (6 tasks, 220 tests). **Slice 2 is
+implemented** (5 tasks, 280 tests before final review fixes): beat end timestamps,
+guarded absence slots, single-location scenes, chat-based episodes, the §5.2 checker,
+and episode/scene rendering beside the unchanged floor. Real quoted speech and explicit
+flashback markers are rendered distinctly. Everything is still template-only: no
+model calls, key, spend, new dependency, or series store.
+
+The Director, model-call safeguards, scene replacement, series storage, recaps,
+character bibles/personas and plot labels remain slice 3. Before adding them, read the
+slice-2 execution notes appended to its plan; that plan's original episode timeout and
+some scene/test assertions contradicted the binding design and were not implemented.
 
 The `tool-fails` rule is settled by evidence, not intuition: a non-zero shell exit
 arrives as `tool.success` carrying `metadata.exit` (verified on the wire, with the
 `shell.exited` join arriving 22 ms *after* the success) — so the rule reads the
 success first and falls back to the join.
 
-**Owner decisions still open** (§12 of the narrative design): the tone; whether an
-episode is a chat or a project; who the Human is; where model calls run and with what
-key and budget; how series are stored; and whether there are seasons, and where the
-script lives once the floor becomes the stage.
+**Owner decisions are settled** in §12 of the narrative design: deadpan/dark tone;
+a chat is an episode and a project is a series; the unseen audience is not a character;
+Director calls use an opt-in separate key through the dev route, provider/code spending
+caps and per-session opt-out; files hold series continuity; no season numbering;
+script first, floor alongside. A resumed chat never becomes a made-up Part Two.
 
 ## If you are a different harness
 

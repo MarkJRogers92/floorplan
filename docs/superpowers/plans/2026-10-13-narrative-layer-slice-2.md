@@ -10,6 +10,10 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-12-narrative-layer-design.md` — read §4.2 (scene rules), §5.2 (the five checks), §5.3 (the cold open), §5.5–5.6 (cast, episodes), §6 (the data model) and §12 (the settled decisions).
 
+**Execution status:** Tasks 1–5 are implemented. The original examples below are a
+historical plan, not the final interfaces: see the execution notes at the end,
+especially D2's chat identity overriding the contradictory Task 3 timeout examples.
+
 ## Global Constraints
 
 - **OpenCode is never modified.** This is a client. No patches, no forks, no plugins.
@@ -671,3 +675,55 @@ git add -A && git commit -m "feat(narrative): render scenes under headings insid
 - **No series store.** `seriesID` is `''`, recaps and bibles need stored beats, and personas need the Director. Slice 3.
 - **No plot labels.** Cold open / A / B / tag are computable but have no consumer until the Director titles them. Slice 3.
 - **No reconnect.** The floor and the narrative both seed once; re-snapshot-on-reconnect (and the tombstone fix it requires) rides with the reconnect slice, not this one.
+
+## Execution notes — Sol, 2026-10-13
+
+All five tasks implemented directly by GPT-6.1 Sol after the interrupted DeepSeek
+dispatches; independent whole-branch review follows. No Luna implementation ran.
+Baseline: 220 tests and typecheck passing. Per-task suites: 237, 251, 258, 272,
+280 tests passing; typecheck passed before every implementation commit. Build passed
+with an existing Vite future native-config-loader warning about extensionless imports.
+
+### Rulings (binding spec wins over the original examples)
+
+1. `endAt` is required; every beat has a final contributing timestamp. Cost if wrong:
+   mechanical updates for new producers/test fixtures.
+2. Scenes carry `rootSessionID`, also documented in §6. Cost if wrong: re-derive
+   parent walks during episode assembly.
+3. `groupLinesByScene` accepts minimal `{id, beats}` scenes. Cost if wrong: a later
+   consumer must supply additional scene fields explicitly.
+4. Duration retains existing five-second rounding and “a moment” for sub-five-second
+   gaps. The plan's nine-/zero-second assertions were wrong. Opener-sensitive tests
+   spend the opener first and assert the actual subject beat. Cost if wrong: display
+   wording only.
+5. A scene is one desk and one root: changing either also cuts. Every root ask cuts,
+   including immediately after a wrap. The original two-scene expectation for
+   ask/use/wrap/ask should be three scenes. Cost if wrong: more cuts, no lost footage.
+6. §12 D2 supersedes the draft ten-minute episode split: a root/chat always retains
+   one episode. `assembleEpisodes(scenes)` needs no unused sessions/beats/time input;
+   it does not pretend a wrap or stream flush closes a resumable chat. Cost if wrong:
+   a future explicit lifecycle API, not a fabricated Part Two.
+7. The ninety-second cut is inclusive and uses the closing beat's `endAt`; long runs
+   cannot evade it. Shared `castByRoot`/`rootFor` scope suffixes to a chat, not unrelated
+   sessions on the floor. Cost if wrong: earlier cuts or explicit timing adjustment.
+8. Scene checks compare agent slots across all cites, not just character speakers:
+   individual slot rendering cannot catch conflated actors. Room presence comes from
+   scene footage, not just its cast array. `ctx.agents` holds resolved CastIDs (including
+   suffixes). Flashbacks never lower the present-time watermark. Cost if wrong:
+   stricter rejection/template fallback, never invented dialogue.
+9. Keep every episode visible rather than hide older chats. The actual page uses the
+   pure `assembleEpisodeViews` pipeline tested with golden footage. Backdated runs
+   gain explicit flashback markers without reordering footage. Guest-desk headings
+   cite child footage if available, otherwise a generic guest-desk line; never rename
+   the caller as the guest. Cost if wrong: more visible context/edit markers.
+
+### Actual browser evidence
+
+The localhost dev page connected live, then replayed the scrubbed golden recording
+(204 frames): replay done, 1 episode, 12 scenes, 44 lines, 0 failed scene checks,
+5 flashbacks. Exit 3, reject and forty seconds appeared in the real page DOM.
+Script/floor measured 613px/386px side by side; the canvas was drawn (7 sampled colors).
+Screenshot capture was refused because the desktop window was hidden, even after
+tabs.focus. This is not a pixel-by-eye check, and hover/focus citation visibility
+remains unverified while that window is unfocused. No raw recording or credential was
+committed, printed or submitted to a model.

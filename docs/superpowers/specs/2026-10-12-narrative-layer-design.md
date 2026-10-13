@@ -344,7 +344,7 @@ type Episode = { id: string; seriesID: string; rootSessionID: string;
                  title?: Line; scenes: Scene[]; cast: CastID[] }
 type Scene   = { id: string; location: Location; cast: CastID[]; beats: string[]; lines: Line[];
                  heading: Line }
-type Location = { kind: 'desk'; sessionID: string } | { kind: 'door' }   // a session's desk; the Human's door
+type Location = { kind: 'desk'; sessionID: string } | { kind: 'to-camera' }   // a session's desk; addressing the audience
 type Beat    = { id: string;        // `b:<first event id>`; BeatKind = the kinds in §4.1
                  at: number;        // `created` of the beat's first event (run start)
                  eventIDs: string[]; kind: BeatKind; sessionID: string; detail: BeatDetail }
@@ -443,20 +443,61 @@ data-path agent's files, so this is reported, not changed; it is additive.
 Funny comes last on purpose: a joke on top of an uncited line is the one failure
 this design cannot recover from.
 
-## 12. Owner decisions
+## 12. Owner decisions — settled 2026-10-13
 
-- **D1. Format and tone.** *Format settled (rev. 3):* docudrama — real work, written
-  story. *Tone still open:* the docudrama sample was deadpan-warm; broader (*Brooklyn
-  Nine-Nine*) or drier (*The Thick of It*, minus the swearing)?
-- **D2. What an episode is.** The owner said "project **or** chat". Proposed: project
-  = series, chat = episode; or project = episode. A chat resumed after a gap: same
-  episode, or "Part 2"?
-- **D3. Talking heads.** *Settled (rev. 3):* real quotes to camera; dramatised
-  dialogue in scene, rendered distinctly (§5.4).
-- **D4. Ruling 14** amendment (§10.2).
-- **D5. The Human:** an unseen character, a named one, or not a character at all.
-- **D6. Model calls:** where they run, which key, which model, what budget (§8).
-- **D7. Series storage** for recaps and bibles, in a browser app: IndexedDB (lost on
-  clear) or files via the dev route (durable, dev only)?
-- **D8. Seasons** (per week, per milestone, none) and **where the script lives** when
-  the floor becomes the stage (a rail beside it, or subtitles under it).
+**D1. Tone — deadpan, darkly comedic, nothing off limits.** The owner's direction, and
+the boundary that survives it: "nothing off limits" sets how bleak the *framing* may be,
+never whether events happened. The citing rule is untouched, so the darkness comes from
+what actually occurred — a `cut`, a `memory-wipe`, a `retry`, a `silence`, a worker
+stuck on the same failing call — which is both funnier and truer than invention. Dark
+framing of a real failure is the target; invented nastiness is still forbidden. Two
+consequences worth naming: a cruel line is cruel about something that really happened,
+and the beats carry the owner's paths, prompts and command output.
+
+**D2. An episode is a chat; a series is a project.** The series key is already
+`location.directory` (§10.1), so this mapping is forced rather than chosen. A chat
+resumed after a gap is the **same episode** — a session is the episode however long it
+runs, and gaps inside it are `silence` beats, which the rollup already raises. A "Part 2"
+boundary would need a rule for what counts as a gap, and that rule would be invented
+rather than observed.
+
+**D3. Talking heads.** Real quotes to camera; dramatised dialogue in scene, rendered
+distinctly (§5.4).
+
+**D4. Only `session.retry.scheduled` is a take.** A repeated `execution.started` is a
+returning guest with a new briefing, not a retry (§10.2).
+
+**D5. The Human is the audience — and is not a character.** There is no Human. The
+audience is the owner, present and unseen, exactly as a documentary crew is present in a
+docudrama. The design was already most of the way there: the `Location` variant called
+`{ kind: 'door' }` becomes **`{ kind: 'to-camera' }`**. A worker with an unanswered
+`knocks` addresses the audience instead of knocking at a door, and `answered` carries the
+audience's reply — the approval itself. The fourth wall is load-bearing: `knocks` is the
+audience being asked, `answered` is the audience answering. Dialogue is never written
+*for* the audience, only *at* it.
+
+**D6. Model calls: a dev route, an opt-in key, a hard cap.** Same shape and the same
+limitation as the credential route — a route in the Vite dev process. The page has
+nowhere safe for a secret, and routing the call through OpenCode would create sessions
+that appear on the floor, i.e. the narrator narrating itself. A key of its own from a
+local env file, never the OpenCode credentials, with a spend cap at the provider as well
+as a per-episode cap in code. **With no key configured the narrative runs template-only
+and sends nothing** — that is the default, so the Director is opt-in twice over. On a cap
+or a failure it degrades down §7's ladder. Per-session opt-out. The threat model, stated
+plainly: a Director call sends the owner's tool names, file paths, prompts and command
+output to a third-party model.
+
+**D7. Series storage: files through the dev route.** Continuity is the asset — running
+jokes, callbacks, the bible — and it is exactly what a cache clear destroys, so IndexedDB
+is the wrong home for it. Files also stay inspectable and hand-editable, which matters
+while the tone is being tuned. Dev-only, like everything else here:
+`~/.local/state/floorplan/series/<key>/`. The browser keeps a read-through cache and
+holds nothing durable.
+
+**D8. No season numbering yet, and the script takes the primary column.** A season is
+simply a project's episodes in order and the bible accumulates across them; named seasons
+are a presentation feature to add if episode cards are ever wanted, and inventing their
+boundaries now would be guesswork. **The script takes the primary column with the floor a
+panel beside it** — the owner's direction is that the script is the main surface now and
+the visuals become the stage later, which is the same shell with the emphasis reversed.
+

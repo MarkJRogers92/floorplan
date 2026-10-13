@@ -72,6 +72,8 @@ built; they were deferred and are the remaining part of the spec's "done means".
 | `src/narrative/script.ts` | beats to script lines, dropping rejected ones |
 | `src/narrative/scene.ts`, `episode.ts` | single-location scene cuts; one episode per root chat |
 | `src/narrative/check.ts`, `views.ts` | scene evidence checks and the pure episode view used by the page |
+| `src/narrative/director.ts`, `director-runtime.ts` | pure model-output admission and nonblocking closed-scene scheduler |
+| `src/dev/director-*.ts`, `src/app/director-client.ts` | server-only paid boundary and browser-safe controls client |
 | `src/room/{layout,room}.ts` | pure geometry, then canvas drawing |
 | `src/app/floor.ts` | `createFloor` — the object the page owns |
 | `src/main.ts`, `index.html` | the page — script primary column, floor panel beside it |
@@ -160,14 +162,22 @@ and episode/scene rendering beside the unchanged floor. Real quoted speech and e
 flashback markers are rendered distinctly. Everything is still template-only: no
 model calls, key, spend, new dependency, or series store.
 
-The Director, model-call safeguards, scene replacement, series storage, recaps,
-character bibles/personas and plot labels remain slice 3. Before adding them, read the
-slice-2 execution notes appended to its plan; that plan's original episode timeout and
-some scene/test assertions contradicted the binding design and were not implemented.
+**Director runtime (slice 3a) is implemented:** optional checked scene replacement,
+separate server-only key, explicit configuration AND page opt-in, conservative 3¢
+reservations, 30¢/chat and $1/server-run default caps, global disable and per-chat opt-out,
+single-flight/deduplication and stale-response protection. Setup/privacy/limits are in
+`docs/director.md`; `.env.example` contains no key. All tests use synthetic providers;
+no real key was configured and no paid generation was performed.
+
+Series storage, recaps, character bibles/personas, plot labels and staged visuals
+remain next. Before extending episode lifecycle, read the slice-2 execution notes;
+that plan's original timeout contradicted D2 and was not implemented.
 The same notes record final review rulings and deferred minors. In particular,
 `{never:}` requires episode-wide closure (not scene closure), full DOM rebuilds may
 need measured optimization for long sessions, and unseen-session cast learning is
-an existing edge case to fix with reconnect/seed handling.
+an existing edge case to fix with reconnect/seed handling. Director counters reset
+on server restart, so provider-side limits are separately required. Do not call the
+runtime cap a daily/lifetime budget, or equate provider budget alerts with hard limits.
 
 The `tool-fails` rule is settled by evidence, not intuition: a non-zero shell exit
 arrives as `tool.success` carrying `metadata.exit` (verified on the wire, with the

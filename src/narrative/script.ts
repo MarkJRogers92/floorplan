@@ -25,6 +25,17 @@ export type ScriptLine = {
 
 export type TemplateFor = (beat: Beat, ctx: ScriptCtx) => Line
 
+/** Closed runs keep their start time; make the backdated edit explicit, never reorder. */
+export function markFlashbacks(lines: ScriptLine[], beats: Map<string, Beat>): ScriptLine[] {
+  let anchor = -Infinity
+  return lines.map(line => {
+    const at = Math.max(...line.beatIDs.map(id => beats.get(id)!.at))
+    const flashback = at < anchor
+    anchor = Math.max(anchor, at)
+    return flashback ? { ...line, line: { ...line.line, flashback: true as const } } : line
+  })
+}
+
 /**
  * Beats → the script, in beat order. A rejected line is dropped, never repaired (§5.1):
  * a missing joke costs nothing, a wrong one breaks the premise.

@@ -34,6 +34,35 @@ describe('groupLinesByScene', () => {
 })
 
 describe('episode views use the actual checker and rendering pipeline', () => {
+  it('replaces a scene only with checked cite-backed Director lines', () => {
+    const beats = [b('a', { kind: 'uses-tool', tool: 'read' })]
+    const replacements = new Map([['scene:a', [{ id: 'untrusted', speaker: 'narrator', template: 'Existence is paperwork.', cites: ['a'] }]]])
+    const group = assembleEpisodeViews(beats, [{ id: 'root', agent: 'build' }], replacements)[0].scenes[0]
+    expect(group.lines[0].text).toBe('Existence is paperwork.')
+    expect(group.mode).toBe('director')
+    expect(group.check.ok).toBe(true)
+  })
+  it('rejects forged, stale-cast and cross-scene replacements in the actual view', () => {
+    const beats = [b('a', { kind: 'uses-tool', tool: 'read' })]
+    for (const candidate of [
+      { id: 'l', speaker: 'narrator', template: 'It ran twice.', cites: ['a'] },
+      { id: 'l', speaker: 'explore', template: 'I belong here.', cites: ['a'] },
+      { id: 'l', speaker: 'narrator', template: 'Unrelated.', cites: ['other-chat'] },
+    ]) {
+      const group = assembleEpisodeViews(beats, [{ id: 'root', agent: 'build' }], new Map([['scene:a', [candidate]]]))[0].scenes[0]
+      expect(group.mode).toBe('templates')
+      expect(group.lines[0].text).toBe('build pointed read.')
+    }
+  })
+  it('replacement cannot bury a critical beat omitted by the model', () => {
+    const beats = [b('a', { kind: 'uses-tool', tool: 'read' }), b('failure', { kind: 'tool-fails', tool: 'shell', exit: 3 }, 1)]
+    const group = assembleEpisodeViews(beats, [{ id: 'root', agent: 'build' }], new Map([['scene:a', [
+      { id: 'l', speaker: 'narrator', template: 'The paperwork was ambitious.', cites: ['a'] },
+    ]]]))[0].scenes[0]
+    expect(group.lines.flatMap(l => l.beatIDs)).toEqual(['a', 'failure'])
+    expect(group.lines[1].text).toContain('exit 3')
+    expect(group.check.ok).toBe(true)
+  })
   it('shows every episode and scene, not just the newest chat', () => {
     const beats = [b('a', { kind: 'human-asks' }, 0, 'r1'), b('b', { kind: 'human-asks' }, 1, 'r2'), b('c', { kind: 'wrap' }, 2, 'r1')]
     const views = assembleEpisodeViews(beats, [{ id: 'r1', agent: 'build' }, { id: 'r2', agent: 'build' }])

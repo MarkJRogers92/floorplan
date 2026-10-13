@@ -2,12 +2,15 @@
 import { castByRoot } from './cast'
 import { checkScene } from './check'
 import { renderLine, type Line } from './line'
-import { assembleScript, type ScriptLine } from './script'
+import { assembleScript, markFlashbacks, type ScriptLine } from './script'
 import type { Scene } from './scene'
 import type { Beat, SessionInfo } from './types'
 
 export type DirectorResult = { lines: ScriptLine[]; mode: 'director' | 'templates' }
 export type DirectorRequest = { sceneID: string; beats: Beat[]; sessions: SessionInfo[] }
+export type DirectorState = { available: boolean; enabled: boolean; model: string; episodeCapCents: number;
+  runCapCents: number; reservedCents: number; excluded: string[] }
+export type DirectorResponse = { lines: Line[]; mode: 'director' | 'templates'; reason: string }
 const object = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const unsupported = /\{(?:ordinal|first|last|never|cost):/
 const outcomeWords = /\b(?:succeeded|success|successfully|failed|failure|interrupted|approved|denied|rejected|cancelled|exit)\b/i
@@ -18,15 +21,7 @@ export function checkDirectorLines(scene: Scene, output: unknown, beats: Beat[],
   const index = new Map(evidence.map(b => [b.id, b]))
   const cast = castByRoot(sessions)
   const ctx = { cast, beats: evidence }
-  const templates = () => {
-    let anchor = -Infinity
-    return assembleScript(evidence, ctx).map(line => {
-      const at = index.get(line.beatIDs[0])!.at
-      const flashback = at < anchor
-      anchor = Math.max(anchor, at)
-      return flashback ? { ...line, line: { ...line.line, flashback: true as const } } : line
-    })
-  }
+  const templates = () => markFlashbacks(assembleScript(evidence, ctx), index)
   const fallback = (): DirectorResult => ({ lines: templates(), mode: 'templates' })
   if (!object(output) || !Array.isArray(output.lines) || !output.lines.length || output.lines.length > 24) return fallback()
   const names = [...sessions.flatMap(s => [s.agent, s.model]), ...evidence.map(b => 'tool' in b.detail ? b.detail.tool : undefined)]

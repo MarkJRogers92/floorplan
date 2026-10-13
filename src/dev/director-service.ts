@@ -1,12 +1,9 @@
-import { checkDirectorLines, type DirectorRequest } from '../narrative/director'
+import { checkDirectorLines, type DirectorRequest, type DirectorState, type DirectorResponse } from '../narrative/director'
 import { assembleScenes } from '../narrative/scene'
 import { parseDirectorRequest } from './director-input'
 import { DIRECTOR_MODEL } from './director-provider'
 
 export type DirectorConfig = { key: string; enabled: boolean; episodeCapCents: number; runCapCents: number }
-export type DirectorState = { available: boolean; enabled: boolean; model: string; episodeCapCents: number;
-  runCapCents: number; reservedCents: number; excluded: string[] }
-export type DirectorResponse = { lines: import('../narrative/line').Line[]; mode: 'director' | 'templates'; reason: string }
 
 export function directorConfig(env: Record<string, string>): DirectorConfig {
   const cap = (key: string, fallback: number) => env[key] === undefined ? fallback :

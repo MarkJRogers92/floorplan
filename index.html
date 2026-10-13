@@ -23,6 +23,7 @@
         flex: 0 0 auto;
         display: flex;
         align-items: center;
+        flex-wrap: wrap;
         gap: 12px;
         padding: 8px 12px;
         border-bottom: 1px solid #374151;
@@ -47,6 +48,17 @@
       }
       #status.error {
         color: #f87171;
+      }
+      #director-status, #director-notice {
+        font-size: 12px;
+        color: #9ca3af;
+      }
+      #director-notice { flex-basis: 100%; }
+      #toolbar button:disabled { opacity: 0.55; cursor: default; }
+      .episode-optout { font-size: 12px; color: #9ca3af; }
+      #script section[data-narration="director"] > .scene::after {
+        content: ' · Director — checked';
+        color: #a5b4fc;
       }
       #stage {
         flex: 1 1 auto;
@@ -124,7 +136,10 @@
         <button id="replay" type="button">Replay</button>
         <label for="recording">Load .jsonl</label>
         <input id="recording" type="file" accept=".jsonl" />
+        <button id="director" type="button" disabled>Enable Director (sends scenes to OpenAI)</button>
+        <span id="director-status" role="status">Director: templates</span>
         <span id="status">connecting…</span>
+        <span id="director-notice">Optional Director sends scene text, paths and quotes to OpenAI. No key means templates only. Default cap: 30¢ per chat, $1 per server run.</span>
       </div>
       <div id="stage">
         <div id="script" role="region" aria-label="Episode script"></div>

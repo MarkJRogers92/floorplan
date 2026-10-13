@@ -897,14 +897,15 @@ git add -A && git commit -m "feat: draw desks as coloured rectangles"
 ### Task 12: Wire it together and see real work on the floor
 
 **Files:**
-- Create: `index.html`, `src/main.ts`, `src/app/floor.ts`
-- Test: `tests/app/floor.test.ts`
+- Create: `index.html`, `src/main.ts`, `src/app/floor.ts`, `src/dev/service-route.ts`
+- Modify: `vite.config.ts` — mount the dev-only credential route
+- Test: `tests/app/floor.test.ts`, `tests/dev/service-route.test.ts`
 
 **Interfaces:**
 - Consumes: `readService` (Task 1); `streamFrames` (Task 4); `Frame` (Task 3); `SessionSnapshot`, `PermissionRequest`, `seedDesks` (Task 7); `ingest`, `desks` (Task 8); `readFrames`, `replay` (Task 9); `createRoom` (Task 11)
-- Produces: `createFloor(): { setSnapshot(sessions: SessionSnapshot[], permissions: PermissionRequest[]): void; push(frame: Frame): void; desks(): Desk[] }` — the single object the page owns
+- Produces: `createFloor(): { setSnapshot(sessions: SessionSnapshot[], permissions: PermissionRequest[]): void; push(frame: Frame): void; desks(): Desk[] }` — the single object the page owns — and `createServiceHandler(read: () => Service): (req: IncomingMessage, res: ServerResponse) => void`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the failing tests — two files, `tests/app/floor.test.ts` first**
 
 ```ts
 // tests/app/floor.test.ts
@@ -950,6 +951,42 @@ describe('createFloor', () => {
 })
 ```
 
+And `tests/dev/service-route.test.ts`, using the same real-`node:http`-server pattern as Task 2:
+
+```ts
+import { describe, it, expect } from 'vitest'
+import { createServer } from 'node:http'
+import { once } from 'node:events'
+import { createServiceHandler } from '../../src/dev/service-route'
+
+async function serve(read: () => unknown) {
+  const s = createServer(createServiceHandler(read as never))
+  s.listen(0, '127.0.0.1'); await once(s, 'listening')
+  const { port } = s.address() as { port: number }
+  const r = await fetch(`http://127.0.0.1:${port}/__service`)
+  const body = await r.text()
+  s.close()
+  return { status: r.status, body }
+}
+
+describe('createServiceHandler', () => {
+  it('serves the service as JSON', async () => {
+    const { status, body } = await serve(() => ({ url: 'http://127.0.0.1:1', password: 'pw' }))
+    expect(status).toBe(200)
+    expect(JSON.parse(body)).toEqual({ url: 'http://127.0.0.1:1', password: 'pw' })
+  })
+
+  it('reports a failure without echoing a path or a password', async () => {
+    const { status, body } = await serve(() => {
+      throw new Error('OpenCode service file not found at /x/service.json')
+    })
+    expect(status).toBe(404)
+    expect(JSON.parse(body).error).toMatch(/not found/i)
+    expect(body).not.toMatch(/secret|password/i)
+  })
+})
+```
+
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `bun run test tests/app/floor.test.ts`
@@ -957,7 +994,9 @@ Expected: FAIL — cannot resolve `../../src/app/floor`
 
 - [ ] **Step 3: Implement `createFloor`, then the page**
 
-`createFloor` owns the registry (Task 8) and exposes the three methods above. `setSnapshot` **replaces** the desk set rather than merging: the snapshot is authoritative for which sessions exist, so a session deleted while we were disconnected disappears and a permission raised during the gap shows. Desks present in both keep the positions they already had. `index.html` holds a full-window `<canvas>` and a small toolbar with a **Replay** button and a file input for a `.jsonl`. `src/main.ts` wires: on load, list running servers' sessions to seed, then stream live; the Replay button runs `replay()` against the chosen file and draws on every frame. If `readService()` throws (Task 1), the page shows that message in the toolbar rather than a blank canvas.
+`createFloor` owns the registry (Task 8) and exposes the three methods above. `setSnapshot` **replaces** the desk set rather than merging: the snapshot is authoritative for which sessions exist, so a session deleted while we were disconnected disappears and a permission raised during the gap shows. Desks present in both keep the positions they already had. `index.html` holds a full-window `<canvas>` and a small toolbar with a **Replay** button and a file input for a `.jsonl`. `src/main.ts` wires: on load, list running servers' sessions to seed, then stream live; the Replay button runs `replay()` against the chosen file and draws on every frame.
+
+**The page cannot read the service file itself.** `src/api/service.ts` is Node-only (`node:fs`/`node:os`/`node:path`) and a browser has no filesystem access, so `vite.config.ts` mounts `createServiceHandler(readService)` at `GET /__service` inside the dev server it already runs, and the page fetches that route for `{url, password}`. `createServiceHandler` calls the injected reader, answers `200` with the JSON or `404` with `{error}`, and never logs the password. Comment in the code that this route is a development aid and a shippable build will need a real credential path. If the route 404s, the page shows its message in the toolbar rather than a blank canvas.
 
 - [ ] **Step 4: Run all tests**
 

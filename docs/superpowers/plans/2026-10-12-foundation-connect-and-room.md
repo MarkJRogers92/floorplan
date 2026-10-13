@@ -397,8 +397,16 @@ git add -A && git commit -m "feat: record the OpenCode event stream to disk"
 ### Task 6: Turn frames into desk state — the centre of gravity
 
 **Files:**
-- Create: `src/state/desk.ts`
+- Modify: `src/state/desk.ts` — its type declarations already exist and are frozen
 - Test: `tests/state/desk.test.ts`
+
+**Frozen contract — read this before you touch the file.** `src/state/desk.ts`
+already exists at the commit this task starts from, and exports `DeskStatus` and
+`Desk`. It is the interface between the data path and the room, and **the room is
+being built concurrently against it by someone else.** Add `createDesk` and
+`applyFrame` to that file and **leave the two type declarations byte-identical**. If
+you conclude a type genuinely has to change, stop and report it as a concern rather
+than changing it — a change here silently breaks work happening in another branch.
 
 **Interfaces:**
 - Consumes: `Frame` (Task 3)
@@ -845,7 +853,7 @@ git add -A && git commit -m "feat: compute desk positions on a grid"
 - Test: `tests/room/room.test.ts`
 
 **Interfaces:**
-- Consumes: `Desk`, `DeskStatus` (Task 6); `Rect` and `layout` (Task 10) — `draw` calls `layout(desks.length, bounds)`
+- Consumes: `Desk`, `DeskStatus` (Task 6) — both come from the frozen contract in `src/state/desk.ts`, which exists before Task 6's other work lands, so this task can be built concurrently; `Rect` and `layout` (Task 10) — `draw` calls `layout(desks.length, bounds)`
 - Produces: `statusColour(status: DeskStatus): string`; `createRoom(canvas: HTMLCanvasElement): { draw(desks: Desk[]): void }`
 
 - [ ] **Step 1: Write the failing test**

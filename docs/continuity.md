@@ -28,6 +28,15 @@ back up and inspect the JSON deliberately; no automatic history deletion is perf
 If a crashed writer leaves `.lock`, stop all writers and inspect/back up that series
 before removing the exact stale lock. Never remove another active writer's lock.
 
+Transient save failures (network errors, a busy writer, server errors or reported
+unavailability) keep the latest cumulative snapshot in memory and retry every30s.
+New footage replaces the pending snapshot, not its older evidence. Reset/replay cancels
+pending retries. Keep the tab open until it reports saved: pending work is not durable
+across tab closure. Corruption, conflicts, full archives and absent static-build routes
+are not retried automatically; inspect the cause without deleting existing history.
+The2MiB/10,000-beat limit applies to the cumulative episode, not just its latest POST;
+once exceeded, earlier saves remain intact but later footage stops archiving visibly.
+
 Character bibles are computed from actual archived beats and retain episode/beat
 proof refs. Recurring identity is the real agent name, not a per-chat display suffix.
 Unknown agents stay unidentified. Bibles are facts; personas are short **invented
@@ -41,3 +50,9 @@ agents may be sent to the existing fixed model. No extra model call is added, no
 old frames/quotes are sent, and the same spending/disable/opt-out checks apply.
 Historical statistics guide fictional motives, not factual claims: full-history
 ordinal/absence/cost slots and “Previously on…” are not implemented yet.
+
+Director opt-in still applies to replay narration. A fresh replay scene may reserve
+the same3¢ as live footage, within the existing caps; “not saved” does **not** mean free.
+Disable Director for a template-only replay. A scene previously attempted live may
+fall back to templates on replay because durable series identity is intentionally
+omitted and cached narration requires an exact request match; it does not spend again.

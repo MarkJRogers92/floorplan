@@ -11,6 +11,7 @@ export function createSeriesClient(fetcher: typeof fetch = fetch, changed: () =>
   let epoch = 0
   let replayMode = false
   let active: AbortController | undefined
+  let retryTimer: ReturnType<typeof setTimeout> | undefined
   let message = 'Local history: waiting for project footage'
   const queued = new Map<string, ArchivedEpisode>()
   const scheduled = new Map<string, string>()
@@ -18,7 +19,7 @@ export function createSeriesClient(fetcher: typeof fetch = fetch, changed: () =>
   const cached = new Map<string, CachedContext>()
   const identity = (e: ArchivedEpisode) => JSON.stringify([e.seriesKey, e.id])
   const pump = () => {
-    if (active || !queued.size) return
+    if (active || retryTimer !== undefined || !queued.size) return
     const [id, episode] = queued.entries().next().value!
     queued.delete(id)
     const controller = new AbortController()
@@ -27,10 +28,16 @@ export function createSeriesClient(fetcher: typeof fetch = fetch, changed: () =>
     message = 'Local history: saving'
     void (async () => {
       let saved = false
+      let retryable = true
       try {
         const response = await fetcher('/__series/episode', { method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(episode), signal: controller.signal, credentials: 'same-origin' })
-        if (!response.ok) throw new Error('local history unavailable')
+        if (!response.ok) {
+          const problem: unknown = await response.json().catch(() => null)
+          retryable = response.status === 423 || response.status >= 500 ||
+            (response.status === 409 && isRecord(problem) && problem.code === 'unavailable')
+          throw new Error('local history unavailable')
+        }
         const receipt: unknown = await response.json()
         if (!isRecord(receipt) || receipt.saved !== true || !Number.isSafeInteger(receipt.episodeCount) || (receipt.episodeCount as number) < 0) {
           throw new Error('local history unavailable')
@@ -49,8 +56,15 @@ export function createSeriesClient(fetcher: typeof fetch = fetch, changed: () =>
         if (started === epoch && !controller.signal.aborted) cached.set(episode.seriesKey, context as CachedContext)
       } catch {
         if (started === epoch && !controller.signal.aborted) {
-          if (!saved) failed.add(id)
+          if (!saved) {
+            failed.add(id)
+            if (retryable) {
+              if (!queued.has(id)) queued.set(id, episode)
+              retryTimer = setTimeout(() => { retryTimer = undefined; pump() }, 30_000)
+            }
+          }
           message = saved ? 'Local history: saved; context unavailable' : 'Local history: unavailable — work remains live'
+          if (!saved && retryable) message += '; retrying in 30s'
         }
       } finally {
         if (active === controller) active = undefined
@@ -61,6 +75,7 @@ export function createSeriesClient(fetcher: typeof fetch = fetch, changed: () =>
   }
   const reset = () => {
     epoch++; active?.abort(); queued.clear(); scheduled.clear(); failed.clear(); cached.clear()
+    clearTimeout(retryTimer); retryTimer = undefined
     replayMode = false
     message = 'Local history: waiting for project footage'
   }

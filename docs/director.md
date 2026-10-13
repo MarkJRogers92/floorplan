@@ -12,6 +12,8 @@ the Director on the page. No configuration or key is changed automatically.
 
 **Privacy:** enabling sends closed scenes' tool names, paths, agent names and real
 text/reasoning quotes to OpenAI. Quotes/footage are treated as untrusted model input.
+Live scoped scenes may also send a bounded advisory character-history/persona summary
+from this project's private archive, never old beat bodies or raw historical quotes.
 No raw event stream or OpenCode password is sent. The API key stays in the local
 dev process, never in a VITE_ variable, browser state, public response or build.
 
@@ -35,8 +37,11 @@ a charge; its reply cannot be displayed after disable/opt-out/replay reset.
 Slow narration keeps only the latest waiting scene; skipped scenes retain templates.
 Disabling/opt-out removes displayed model narration. Re-enabling currently applies
 to newly closing scenes, not already attempted ones; aborted attempts are not retried.
-Reload/replay may reuse a completed server-cached response without another provider
-call, but does not retry a cached failure. A transient state-route failure also pauses
+Reload may reuse a completed server-cached response without another provider call.
+Replay omits durable project scope to prevent history/persona writes, so a scene
+previously attempted live may instead use templates without spending again. Fresh
+replay scenes can still spend when Director is enabled; disable it for free replay.
+Neither path retries a cached failure. A transient state-route failure also pauses
 the client and returns it to templates.
 
 The middleware is dev-only and loopback-only. POST requires matching Origin and
@@ -44,5 +49,7 @@ Host plus JSON. Vite CORS is disabled explicitly; forged Hosts/foreign origins f
 before spending. No custom provider URL is accepted. Do not expose the dev server
 through a public tunnel. A static production build deliberately has no Director route.
 
-Series continuity, recaps, personas and full-episode absence/ordinal/cost slots are
-not implemented yet. A scene closing does not prove that an episode never did something.
+Local series continuity and write-once invented personas are implemented in the
+existing completion; see `continuity.md` for storage/privacy/limits. Recaps and
+full-episode absence/ordinal/cost slots remain deferred. A scene closing does not prove
+that an episode never did something.

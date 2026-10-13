@@ -182,6 +182,34 @@ write-once invented persona with an archived debut; no extra model call is added
 See `docs/continuity.md` for privacy, bounds and safe failure behavior. No keys or paid
 app calls were used in verification. The no-key golden browser replay stayed at zero
 archived episodes and zero reserved cents (204 frames, 44 lines, 12 checked scenes).
+The final continuity suite is **385 tests/40 files**, typecheck/build clean; server key,
+provider endpoint and default archive path are absent from the browser bundle.
+DeepSeek API independently reviewed the whole branch and ran380 tests plus synthetic
+adversarial checks. Its one Important finding (abandoned transient terminal saves) was
+fixed with failing-then-passing tests: latest cumulative snapshots retry every30s,
+new footage coalesces, and replay/reset cancels pending retries. Pending saves are
+in-memory only; keep the tab open until saved. Actual local REST seed returned50rows,
+all with recognizable directory/project scope; only categorical counts were inspected.
+
+**Continuity rulings:** normalized root-owned keys only (no redundant raw scope fields);
+canonical raw agent names, never suffix stripping; semantic beat conflicts reject the
+whole update but key ordering is irrelevant; required key/root and up to8 repeated
+agent params, unknown path wins before method; exact compact JSON bounds and no
+readonly permission weakening. Changing these requires explicit schema/API migration,
+not destructive repair. Local Director requests keep eventIDs for immutable debut
+proof; provider strips them, and dense32KiB requests safely become templates. Replays
+omit durable scope (no context/persona persistence, and cached live lines may become
+templates); existing enabled fresh-replay spend remains opt-in/capped and is disclosed.
+No key or window-unlock workaround was used; paid humor acceptance/by-eye art remains
+unverified. Existing cache lifetime/lifecycle/DOM/cast limits and identity-length caps
+remain unchanged, with refusal/template fallback rather than guessed evidence.
+
+**Continuity deferred minors:** cumulative2MiB/10,000-beat episode limit stops later
+saves while keeping prior history; read-through cache has no page consumer yet (extra
+local GET); conflict/full diagnostics can overgeneralize validation errors; crash-left
+temp files, stale-lock UI guidance and extra per-frame scene/grouping work need focused
+follow-up. Success already clears its failed-snapshot marker; the review's contrary
+claim was checked against `failed.delete(id)`, not accepted as a bug.
 
 Recaps, plot labels and staged visuals remain next. Before extending episode lifecycle, read the slice-2 execution notes;
 that plan's original timeout contradicted D2 and was not implemented.

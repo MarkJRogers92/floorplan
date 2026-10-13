@@ -131,6 +131,8 @@ describe('calls join by id', () => {
     ])
     expect(beats).toEqual([])
     expect(flush(state)).toEqual([])
+    const success = rollup(state, f('tool.success', { sessionID: 'x', id: 'c1' }, { id: 'c' }))
+    expect(success.beats[0].eventIDs).toEqual(['c'])
   })
 
   it('still attaches a shell exit code when unrelated frames arrive in between', () => {

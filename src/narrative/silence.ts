@@ -102,7 +102,7 @@ export function checkSilence(params: {
   const detail: BeatDetail = { kind: 'silence', fromEventID: prior.lastEventID, toEventID, ms: at - prior.lastAt }
   return {
     id: beatID(eventIDs, 'silence', sessionID, at),
-    at, eventIDs, kind: 'silence', sessionID, detail,
+    at, endAt: at, eventIDs, kind: 'silence', sessionID, detail,
   }
 }
 

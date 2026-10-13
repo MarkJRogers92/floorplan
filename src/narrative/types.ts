@@ -45,6 +45,8 @@ export type Beat = {
   id: string
   /** `created` of the beat's first event — the run's start for a run. 0 if the wire carried none. */
   at: number
+  /** `created` of the last event contributing to this beat. */
+  endAt: number
   /** Every event id joined into this beat, in arrival order: a think of 317 deltas cites 317. */
   eventIDs: string[]
   kind: BeatKind
@@ -75,6 +77,7 @@ export type OpenRun = {
   sessionID: string
   kind: 'thinks' | 'says'
   at: number
+  endAt: number
   eventIDs: string[]
   /** Deltas only: the frames that carried the worker's actual words. */
   deltas: number

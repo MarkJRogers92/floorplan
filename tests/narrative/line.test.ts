@@ -4,7 +4,7 @@ import type { Beat } from '../../src/narrative/types'
 
 const beats = new Map<string, Beat>()
 const b = (id: string, kind: any, detail: any, at = 0, sessionID = 'x'): Beat =>
-  ({ id, at, eventIDs: [id.slice(2)], kind, sessionID, detail })
+  ({ id, at, endAt: at, eventIDs: [id.slice(2)], kind, sessionID, detail })
 
 beforeEach(() => {
   beats.clear()

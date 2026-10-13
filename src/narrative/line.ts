@@ -20,7 +20,7 @@ export type Line = {
 
 export type Rendered = { text: string; delivery: 'narration' | 'real-speech' | 'dramatised' }
 
-type Ctx = { cast: (sessionID: string) => CastID; beats: Beat[] }
+type Ctx = { cast: (sessionID: string) => CastID; beats: Beat[]; closed?: boolean }
 
 const reject = (reason: string): { rejected: string } => ({ rejected: reason })
 
@@ -141,6 +141,7 @@ const ordinalWord = (n: number): string => {
 }
 
 const formatDuration = (ms: number): string | undefined => {
+  if (!Number.isFinite(ms)) ms = 0
   if (ms < 0) return undefined
   const sec = Math.floor(ms / 1000)
   if (sec < 60) {
@@ -157,7 +158,8 @@ const isToolBeat = (beat: Beat): boolean =>
 const isRunBeat = (beat: Beat): beat is Beat & { detail: { kind: 'thinks' | 'says'; deltas: number } } =>
   beat.kind === 'thinks' || beat.kind === 'says'
 
-const matchesKey = (beat: Beat, key: string): boolean => {
+const matchesKey = (beat: Beat | undefined, key: string): boolean => {
+  if (beat === undefined) return false
   if (beat.kind === key) return true
   if (isToolBeat(beat) && (beat.detail as { tool?: string }).tool === key) return true
   return false
@@ -171,7 +173,10 @@ const beatsInRange = (beats: Map<string, Beat>, order: string[], range: Range): 
   if (fromIdx === -1 || toIdx === -1) return []
   const start = Math.min(fromIdx, toIdx)
   const end = Math.max(fromIdx, toIdx)
-  return order.slice(start, end + 1).map(id => beats.get(id)!).filter(Boolean)
+  return order.slice(start, end + 1).flatMap(id => {
+    const beat = beats.get(id)
+    return beat === undefined ? [] : [beat]
+  })
 }
 
 type ToolDetail = { tool: string | 'unknown'; callID?: string; path?: string; exit?: number }
@@ -206,7 +211,7 @@ const renderSlot = (
     case 'ordinal': {
       const target = getBeat(beats, slot.beat)
       if (target === undefined) return undefined
-      const idx = order.filter(id => matchesKey(beats.get(id)!, slot.key)).indexOf(slot.beat)
+      const idx = order.filter(id => matchesKey(beats.get(id), slot.key)).indexOf(slot.beat)
       if (idx === -1) return undefined
       return ordinalWord(idx + 1)
     }
@@ -229,13 +234,13 @@ const renderSlot = (
     case 'first': {
       const target = getBeat(beats, slot.beat)
       if (target === undefined) return undefined
-      const idx = order.filter(id => matchesKey(beats.get(id)!, slot.key)).indexOf(slot.beat)
+      const idx = order.filter(id => matchesKey(beats.get(id), slot.key)).indexOf(slot.beat)
       return idx === 0 ? 'first' : undefined
     }
     case 'last': {
       const target = getBeat(beats, slot.beat)
       if (target === undefined) return undefined
-      const matches = order.filter(id => matchesKey(beats.get(id)!, slot.key))
+      const matches = order.filter(id => matchesKey(beats.get(id), slot.key))
       return matches[matches.length - 1] === slot.beat ? 'last' : undefined
     }
     case 'tool': {
@@ -259,7 +264,7 @@ const renderSlot = (
       switch (beat.kind) {
         case 'wrap': return 'succeeded'
         case 'cut': return (beat.detail as { reason: string }).reason || 'interrupted'
-        case 'answered': return (beat.detail as { reply: string }).reply
+        case 'answered': return (beat.detail as { reply: string }).reply || undefined
         case 'tool-fails': {
           const d = toolDetail(beat)
           return d?.exit !== undefined ? `exit ${d.exit}` : 'failed'
@@ -275,7 +280,7 @@ const renderSlot = (
       const list = beatsInRange(beats, order, slot.range)
       if (list.length === 0) return undefined
       const first = list[0]!.at
-      const last = list[list.length - 1]!.at
+      const last = list[list.length - 1]!.endAt
       return formatDuration(last - first)
     }
     case 'cost': {
@@ -294,7 +299,8 @@ const renderSlot = (
       return formatDuration((beat.detail as { ms: number }).ms)
     }
     case 'never': {
-      const count = order.filter(id => matchesKey(beats.get(id)!, slot.key)).length
+      if (ctx.closed !== true) return undefined
+      const count = order.filter(id => matchesKey(beats.get(id), slot.key)).length
       return count === 0 ? 'never once' : undefined
     }
     case 'hedge': {
@@ -308,6 +314,7 @@ export function renderLine(line: Line, beats: Map<string, Beat>, ctx: Ctx): Rend
 
   const order = ctx.beats.map(b => b.id)
   const cited = new Set(line.cites)
+  if ([...order, ...cited].some(id => !beats.has(id))) return reject('missing beat evidence')
 
   // Parse and validate every slot before any rendering.
   const slots: { raw: string; slot: Slot; start: number; end: number }[] = []

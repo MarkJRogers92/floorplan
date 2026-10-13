@@ -1,6 +1,6 @@
 /**
- * Free-text lint data (design §5.1). Kept separate from `line.ts` so the file
- * stays under the project size limit; the logic that uses it lives there.
+ * Free-text lint data and pure helpers (design §5.1), kept separate from
+ * `line.ts` so the file stays under the project size limit.
  */
 
 export const NUMBER_WORDS = new Set([

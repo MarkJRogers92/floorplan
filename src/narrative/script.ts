@@ -14,7 +14,7 @@ import { renderLine, type Line, type Rendered } from './line'
 import { templateFor as defaultTemplateFor } from './templates'
 import type { Beat } from './types'
 
-export type ScriptCtx = { cast: (sessionID: string) => CastID; beats: Beat[] }
+export type ScriptCtx = { cast: (sessionID: string) => CastID; beats: Beat[]; closed?: boolean }
 
 export type ScriptLine = {
   line: Line
@@ -53,6 +53,7 @@ export function assembleScript(
  * first beat, rendered through the same checker as any other line. The location this
  * slice recognises is the session's desk, so the heading is that desk's cast name —
  * the `{agent:}` slot's own output, never an invented title.
+ * Precondition: ctx.beats includes this beat and ctx.cast always returns a cast id.
  */
 export function sceneHeadingFor(beat: Beat, ctx: ScriptCtx): ScriptLine {
   const templateFor: TemplateFor = b => ({

@@ -3,7 +3,7 @@ import { assembleScript, sceneHeadingFor } from '../../src/narrative/script'
 import type { Beat } from '../../src/narrative/types'
 
 const b = (id: string, kind: any, detail: any, at = 0, sessionID = 'x'): Beat =>
-  ({ id, at, eventIDs: [id.slice(2)], kind, sessionID, detail })
+  ({ id, at, endAt: at, eventIDs: [id.slice(2)], kind, sessionID, detail })
 const ctx = (beats: Beat[] = []) => ({ cast: () => 'build', beats })
 
 describe('assembleScript', () => {

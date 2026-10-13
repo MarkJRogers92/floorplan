@@ -80,8 +80,10 @@ export function seedRollup(state: RollupState, snapshot: NarrativeSnapshot): Rol
   for (const session of snapshot?.sessions ?? []) {
     if (typeof session?.id !== 'string' || session.id === '') continue
     const known = sessions.get(session.id)
-    sessions.set(session.id, { ...known, ...session })
-    if (session.parentID === undefined) roots.add(session.id)
+    const merged = { ...known, ...Object.fromEntries(Object.entries(session).filter(([, value]) => value !== undefined)) } as SessionInfo
+    sessions.set(session.id, merged)
+    if (merged.parentID === undefined) roots.add(session.id)
+    else roots.delete(session.id)
   }
 
   const pending = new Map(state.pending)
@@ -127,7 +129,7 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
   /** A beat raised by this frame alone: its one event is the frame's own. */
   const raise = (kind: BeatKind, subject: string, detail: BeatDetail, openerEventIDs?: string[]): Beat => {
     const eventIDs = openerEventIDs ?? (id === undefined ? [] : [id])
-    return { id: beatID(eventIDs, kind, subject, at), at, eventIDs, kind, sessionID: subject, detail }
+    return { id: beatID(eventIDs, kind, subject, at), at, endAt: at, eventIDs, kind, sessionID: subject, detail }
   }
 
   // §4.1 silence — checked at entry, before this frame is processed, so the working
@@ -301,6 +303,7 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
         beats.push({
           id: beatID(eventIDs, current.kind, current.sessionID, current.at),
           at: current.at,
+          endAt: at,
           eventIDs,
           kind: current.kind,
           sessionID: current.sessionID,
@@ -312,6 +315,7 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
       // An id-less delta still counts as a delta — it happened — it just cannot be cited.
       open = new Map(open).set(key, {
         ...current,
+        endAt: at,
         eventIDs: id === undefined ? current.eventIDs : [...current.eventIDs, id],
         deltas: current.deltas + (part === 'delta' ? 1 : 0),
       })
@@ -319,7 +323,7 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
       // We joined mid-run: no `X.started` was seen, so this first delta raises the run.
       // A frame with no id cannot — there would be nothing to name the beat by.
       open = new Map(open).set(key, {
-        sessionID, kind: runKind, at, eventIDs: [id],
+        sessionID, kind: runKind, at, endAt: at, eventIDs: [id],
         deltas: part === 'delta' ? 1 : 0,
       })
     }
@@ -354,6 +358,7 @@ export function flush(state: RollupState): Beat[] {
       beats.push({
         id: beatID([], 'episode-opens', run.sessionID, run.at),
         at: run.at,
+        endAt: run.at,
         eventIDs: [],
         kind: 'episode-opens',
         sessionID: run.sessionID,
@@ -363,6 +368,7 @@ export function flush(state: RollupState): Beat[] {
     beats.push({
       id: beatID(run.eventIDs, run.kind, run.sessionID, run.at),
       at: run.at,
+      endAt: run.endAt,
       eventIDs: run.eventIDs,
       kind: run.kind,
       sessionID: run.sessionID,

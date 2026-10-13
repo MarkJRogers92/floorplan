@@ -166,7 +166,7 @@ describe('the rules the tests above leave implicit', () => {
     const r = rollup(s, f('reasoning.delta', { sessionID: 'x' }))
     expect(r.beats).toEqual([])
     expect(flush(r.state)).toEqual([{
-      id: 'b:a', at: 0, eventIDs: ['a'], kind: 'thinks', sessionID: 'x',
+      id: 'b:a', at: 0, endAt: 0, eventIDs: ['a'], kind: 'thinks', sessionID: 'x',
       detail: { kind: 'thinks', deltas: 1 },
     }])
   })

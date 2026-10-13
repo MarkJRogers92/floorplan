@@ -45,7 +45,7 @@ const exitCode = (data: Data, call?: OpenCall): number | undefined =>
  * So `tool-fails` is raised by `tool.failed` **and** by a `tool.success` whose
  * reported exit code is non-zero, from either source.
  */
-export const raisesToolFails = (frameType: string, frameData: Data, call?: OpenCall): boolean => {
+const raisesToolFails = (frameType: string, frameData: Data, call?: OpenCall): boolean => {
   if (frameType === 'tool.failed') return true
   if (frameType !== 'tool.success') return false
   const exit = exitCode(frameData, call)
@@ -170,6 +170,7 @@ export function foldCall(params: {
       beats.push({
         id: beatID(eventIDs, 'tool-fails', sessionID, callAt),
         at: callAt,
+        endAt: at,
         eventIDs,
         kind: 'tool-fails',
         sessionID,
@@ -179,6 +180,7 @@ export function foldCall(params: {
       beats.push({
         id: beatID(eventIDs, 'guest-leaves', sessionID, callAt),
         at: callAt,
+        endAt: at,
         eventIDs,
         kind: 'guest-leaves',
         sessionID,
@@ -190,10 +192,11 @@ export function foldCall(params: {
       const tool = existing?.tool === 'subagent' ? 'unknown' : str(data.name) ?? existing?.tool ?? 'unknown'
       const detail: BeatDetail = { kind: 'uses-tool', tool }
       if (callID !== undefined) detail.callID = callID
-      if (existing?.exit !== undefined) detail.exit = existing.exit
+      if (exit !== undefined) detail.exit = exit
       beats.push({
         id: beatID(eventIDs, 'uses-tool', sessionID, callAt),
         at: callAt,
+        endAt: at,
         eventIDs,
         kind: 'uses-tool',
         sessionID,

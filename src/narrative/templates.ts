@@ -48,6 +48,7 @@ export function templateFor(beat: Beat, ctx: Ctx): Line {
       if (runDetail.text !== undefined && runDetail.text !== '') {
         return character(agentOf(beat, ctx), '{quote:' + id(beat) + '}', [id(beat)])
       }
+      if (runDetail.deltas === 0) return narrator('{agent:' + id(beat) + '} said its piece.', [id(beat)])
       return narrator('{agent:' + id(beat) + '} said its piece in {deltas:' + id(beat) + '} parts.', [id(beat)])
     }
 
@@ -70,7 +71,9 @@ export function templateFor(beat: Beat, ctx: Ctx): Line {
       return narrator('Someone knocked.', [id(beat)])
 
     case 'answered':
-      return narrator('The knock was answered: {outcome:' + id(beat) + '}.', [id(beat)])
+      return narrator((beat.detail as { reply: string }).reply
+        ? 'The knock was answered: {outcome:' + id(beat) + '}.'
+        : 'The knock was answered.', [id(beat)])
 
     case 'retry':
       return narrator('A retry was scheduled.', [id(beat)])

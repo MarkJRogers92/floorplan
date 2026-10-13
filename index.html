@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>floorplan</title>
+    <style>
+      html, body, #app {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #111827;
+        color: #e5e7eb;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+      #app {
+        display: flex;
+        flex-direction: column;
+      }
+      #toolbar {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 12px;
+        border-bottom: 1px solid #374151;
+        background: #1f2937;
+      }
+      #toolbar button, #toolbar label {
+        padding: 6px 12px;
+        border: 1px solid #4b5563;
+        border-radius: 6px;
+        background: #111827;
+        color: #e5e7eb;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      #toolbar input[type="file"] {
+        display: none;
+      }
+      #status {
+        margin-left: auto;
+        font-size: 13px;
+        color: #9ca3af;
+      }
+      #status.error {
+        color: #f87171;
+      }
+      #stage {
+        flex: 1 1 auto;
+        display: flex;
+        min-height: 0;
+      }
+      #floor {
+        flex: 1 1 auto;
+        min-width: 0;
+        position: relative;
+      }
+      #floor canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      #script {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="toolbar">
+        <button id="replay" type="button">Replay</button>
+        <label for="recording">Load .jsonl</label>
+        <input id="recording" type="file" accept=".jsonl" />
+        <span id="status">connecting…</span>
+      </div>
+      <div id="stage">
+        <div id="floor"><canvas id="canvas"></canvas></div>
+        <div id="script"></div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

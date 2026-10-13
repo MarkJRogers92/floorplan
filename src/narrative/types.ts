@@ -77,6 +77,21 @@ export type OpenRun = {
   deltas: number
 }
 
+/**
+ * A tool call still waiting for its outcome. Joins `input.started` (name) → `called`
+ * → `progress` by the call's `id`; a `shell.exited` joins via the progress's
+ * `metadata.shellID`. Emitted on `tool.success` or `tool.failed`.
+ */
+export type OpenCall = {
+  sessionID: string
+  callID: string
+  at: number
+  tool?: string
+  eventIDs: string[]
+  shellID?: string
+  exit?: number
+}
+
 /** The rollup's whole memory. Replaced, never mutated — the reducer stays pure. */
 export type RollupState = {
   /** Every event id already folded in: a reconnect replays frames we have already seen. */
@@ -87,6 +102,8 @@ export type RollupState = {
    * and speaking at once, and neither run may lose its own frames to the other.
    */
   open: Map<string, OpenRun>
+  /** Calls keyed by call id, waiting for success or failure. */
+  calls: Map<string, OpenCall>
   /** Sessions with no parent: an episode is one root session (§5.6). */
   roots: Set<string>
   /** Requests asked and not yet answered, requestID → sessionID: the audience is being asked. */

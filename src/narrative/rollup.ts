@@ -26,7 +26,7 @@
 
 import type { Frame } from '../api/sse'
 import type {
-  Beat, BeatDetail, BeatKind, NarrativeSnapshot, OpenRun, RollupState, SessionInfo,
+  Beat, BeatDetail, BeatKind, NarrativeSnapshot, OpenCall, OpenRun, RollupState, SessionInfo,
 } from './types'
 
 type Data = Record<string, unknown>
@@ -69,7 +69,7 @@ const setSession = (sessions: Map<string, SessionInfo>, info: SessionInfo): Map<
 
 export function createRollup(): RollupState {
   return {
-    seenIDs: new Set(), sessions: new Map(), open: new Map(),
+    seenIDs: new Set(), sessions: new Map(), open: new Map(), calls: new Map(),
     roots: new Set(), pending: new Map(),
   }
 }
@@ -118,6 +118,7 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
   let sessions = state.sessions
   let roots = state.roots
   let open = state.open
+  let calls = state.calls
   let pending = state.pending
   const beats: Beat[] = []
 
@@ -156,6 +157,12 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
       const next = new Set(roots)
       next.delete(sessionID)
       roots = next
+    }
+    // §4.1: a guest arrives exactly once, on session.created with a parentID.
+    // A seeded guest already existed and never emitted an arrival event.
+    if (parentID !== undefined && !known?.arrived) {
+      sessions = setSession(sessions, { ...sessions.get(sessionID)!, arrived: true })
+      beats.push(raise('guest-arrives', sessionID, { kind: 'guest-arrives', childSessionID: sessionID }))
     }
   }
 
@@ -240,6 +247,118 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
     beats.push(raise('cut', sessionID, { kind: 'cut', reason: str(data.reason) ?? '' }))
   }
 
+  // --- calls: tool uses and subagent guests, joined by the call's id (§4.1) --------
+
+  /**
+   * §4.1 provisional: only `tool.failed` raises `tool-fails` in this slice. Task 4 may
+   * amend this one branch (e.g. a non-zero shell exit arriving as `tool.success`) instead
+   * of spattering the decision through the joins.
+   */
+  const raisesToolFails = (frameType: string, _frameData: Data, _call?: OpenCall): boolean =>
+    frameType === 'tool.failed'
+
+  const callID = str(data.id)
+  if (type === 'tool.input.started' && callID !== undefined && sessionID !== '') {
+    const tool = str(data.name)
+    const existing = calls.get(callID)
+    const eventIDs = existing
+      ? (id === undefined ? existing.eventIDs : [...existing.eventIDs, id])
+      : (id === undefined ? [] : [id])
+    calls = new Map(calls).set(callID, {
+      sessionID,
+      callID,
+      at: existing?.at ?? at,
+      tool: tool ?? existing?.tool,
+      eventIDs,
+      shellID: existing?.shellID,
+      exit: existing?.exit,
+    })
+  }
+
+  if (type === 'tool.called' && callID !== undefined) {
+    const existing = calls.get(callID)
+    if (existing !== undefined) {
+      calls = new Map(calls).set(callID, {
+        ...existing,
+        eventIDs: id === undefined ? existing.eventIDs : [...existing.eventIDs, id],
+      })
+    }
+  }
+
+  if (type === 'tool.progress' && callID !== undefined) {
+    const existing = calls.get(callID)
+    if (existing !== undefined) {
+      const metadata = typeof data.metadata === 'object' && data.metadata !== null ? (data.metadata as Data) : {}
+      calls = new Map(calls).set(callID, {
+        ...existing,
+        eventIDs: id === undefined ? existing.eventIDs : [...existing.eventIDs, id],
+        shellID: str(metadata.shellID) ?? existing.shellID,
+      })
+    }
+  }
+
+  if (type === 'shell.exited') {
+    const shellID = str(data.id)
+    if (shellID !== undefined) {
+      for (const [cid, call] of calls) {
+        if (call.shellID === shellID) {
+          calls = new Map(calls).set(cid, {
+            ...call,
+            eventIDs: id === undefined ? call.eventIDs : [...call.eventIDs, id],
+            exit: num(data.exit) ?? call.exit,
+          })
+          break
+        }
+      }
+    }
+  }
+
+  if ((type === 'tool.success' || type === 'tool.failed') && callID !== undefined) {
+    const existing = calls.get(callID)
+    const metadata = typeof data.metadata === 'object' && data.metadata !== null ? (data.metadata as Data) : {}
+    const childSessionID = str(metadata.sessionID)
+    const eventIDs = existing
+      ? (id === undefined ? existing.eventIDs : [...existing.eventIDs, id])
+      : (id === undefined ? [] : [id])
+    const nextCalls = new Map(calls)
+    nextCalls.delete(callID)
+    calls = nextCalls
+    const callAt = existing?.at ?? at
+
+    openEpisode(sessionID) // §4.1: a call beat may be the root's first beat
+
+    if (raisesToolFails(type, data, existing)) {
+      beats.push({
+        id: beatID(eventIDs, 'tool-fails', sessionID, callAt),
+        at: callAt,
+        eventIDs,
+        kind: 'tool-fails',
+        sessionID,
+        detail: { kind: 'tool-fails', tool: str(data.name) ?? existing?.tool ?? 'unknown', callID },
+      })
+    } else if (childSessionID !== undefined || existing?.tool === 'subagent') {
+      beats.push({
+        id: beatID(eventIDs, 'guest-leaves', sessionID, callAt),
+        at: callAt,
+        eventIDs,
+        kind: 'guest-leaves',
+        sessionID,
+        detail: { kind: 'guest-leaves', childSessionID: childSessionID ?? '', callID },
+      })
+    } else {
+      const detail: BeatDetail = { kind: 'uses-tool', tool: existing?.tool ?? 'unknown', callID }
+      if (existing?.exit !== undefined) detail.exit = existing.exit
+      beats.push({
+        id: beatID(eventIDs, 'uses-tool', sessionID, callAt),
+        at: callAt,
+        eventIDs,
+        kind: 'uses-tool',
+        sessionID,
+        detail,
+      })
+    }
+  }
+
   // --- runs: a think or a say, from its first frame to its last (§4.1) -------------
   // A run opens on `X.started`, or on the first `X.delta` when we joined mid-run, and
   // closes on `X.ended`. Its beat is emitted at the close, because only then is the delta
@@ -294,7 +413,7 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
     }
   }
 
-  return { state: { seenIDs, sessions, open, roots, pending }, beats }
+  return { state: { seenIDs, sessions, open, calls, roots, pending }, beats }
 }
 
 /**

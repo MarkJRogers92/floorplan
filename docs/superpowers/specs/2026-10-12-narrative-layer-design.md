@@ -105,7 +105,7 @@ on every reconnect, as the floor does (spec §6.3).
 | `thinks` | `reasoning.started` (or the first `reasoning.delta` if joined mid-run) | closed by that session's `reasoning.ended`; carries the delta count, which may be 0 |
 | `says` | `text.started` (or first `text.delta`) | closed by `text.ended`; carries the delta count and the ended frame's id |
 | `uses-tool` | `tool.success`, any tool but `subagent` (a nameless success carrying `metadata.sessionID` is a `guest-leaves`) | joins `input.started` (name) → `called` → `progress`* by call `id`; name `unknown` if joined mid-call; shell exit code joined via `progress.metadata.shellID` → `shell.exited.id` |
-| `tool-fails` | `tool.failed` | as above; **immediate** |
+| `tool-fails` | `tool.failed`, **and** a `tool.success` whose reported shell exit is non-zero (settled by the Task 4 recording) | as above; **immediate**; carries `exit` |
 | `guest-arrives` | `session.created` carrying a `parentID` | linked to a call by that call's `input.sessionID`, which precedes the arrival and is therefore determinable; **never** by "the parent's open call"; and not from the success's `metadata.sessionID`, which arrives after the beat is emitted and beats are immutable |
 | `guest-leaves` | `tool.success` of a `subagent` call | **instead of** `uses-tool`, never as well; the child is `metadata.sessionID`. One per call, so a returning guest leaves twice and arrives once |
 | `knocks` | `permission.asked`, `form.created` | **immediate** |
@@ -137,11 +137,16 @@ records **all** its event ids: a `thinks` of 317 deltas cites 317. When an
 *produced* that beat rather than the beat's own first frame — an opener and its beat
 must never share an id, because citing is by id and two beats with one id break it.
 
-**`tool-fails` probably misses real failures.** A non-zero shell exit may arrive as
-`tool.success`, and this recording has no failure to check. Before building, record
-a deliberate failure of each tool and decide whether a non-zero exit (via the shell
-join) or success metadata should raise `tool-fails`. Meanwhile `uses-tool` carries
-the exit code, citable.
+**`tool-fails` and non-zero exits — settled by the Task 4 recording (2026-10-13).**
+A shell command that exits non-zero arrives as `tool.success` carrying
+`metadata.exit` and `metadata.status: "completed"`; no `tool.failed` frame appeared
+for it (or anywhere) in the recording. So the rule as first written misses every
+real shell failure. `tool-fails` is raised by `tool.failed` **and** by a
+`tool.success` whose reported exit code is non-zero. The exit is read from the
+success's own `metadata.exit` first, falling back to the joined `shell.exited` code:
+in the recording the `shell.exited` arrived 22 ms *after* the success it belongs to,
+so the join alone is not dependable at decision time. `uses-tool` remains the beat
+for exit 0 and carries the code from either source, citable.
 
 ### 4.2 The Director — the edit
 

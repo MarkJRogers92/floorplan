@@ -4,6 +4,9 @@ import type { Service } from './service'
 export function authedFetch(service: Service, path: string, init: RequestInit = {}): Promise<Response> {
   const base = service.url.replace(/\/+$/, '')
   const headers = new Headers(init.headers)
-  headers.set('Authorization', 'Basic ' + Buffer.from('opencode:' + service.password).toString('base64'))
+  const bytes = new TextEncoder().encode(`opencode:${service.password}`)
+  let binary = ''
+  for (const b of bytes) binary += String.fromCharCode(b)
+  headers.set('Authorization', 'Basic ' + btoa(binary))
   return fetch(base + path, { ...init, headers })
 }

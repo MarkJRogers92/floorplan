@@ -1,0 +1,22 @@
+{"id":"evt_s001","type":"server.connected","data":{}}
+{"id":"evt_s002","type":"session.created","data":{"sessionID":"sess-alpha","slug":"sample-alpha","title":"Example task","agent":"build","version":"2"}}
+{"id":"evt_s003","type":"session.created","data":{"sessionID":"sess-beta","slug":"sample-beta","title":"Example task","agent":"build","version":"2"}}
+{"id":"evt_s004","type":"session.inbox.enqueued","data":{"sessionID":"sess-alpha","inboxID":"inb_a1","item":{"type":"user"}}}
+{"id":"evt_s005","type":"session.execution.started","data":{"sessionID":"sess-alpha"}}
+{"id":"evt_s006","type":"session.inbox.delivered","data":{"sessionID":"sess-alpha","inboxID":"inb_a1"}}
+{"id":"evt_s007","type":"session.step.started","data":{"sessionID":"sess-alpha","assistantMessageID":"msg_a1"}}
+{"id":"evt_s008","type":"session.reasoning.delta","data":{"sessionID":"sess-alpha","delta":"..."}}
+{"id":"evt_s009","type":"session.created","data":{"sessionID":"sess-gamma","slug":"sample-gamma","title":"Example task","agent":"plan","version":"2"}}
+{"id":"evt_s010","type":"session.tool.input.started","data":{"sessionID":"sess-alpha","assistantMessageID":"msg_a1","id":"call_a1","name":"read"}}
+{"id":"evt_s011","type":"session.tool.called","data":{"sessionID":"sess-alpha","assistantMessageID":"msg_a1","id":"call_a1","input":{"path":"example.txt"},"executed":true}}
+{"id":"evt_s012","type":"session.execution.started","data":{"sessionID":"sess-beta"}}
+{"id":"evt_s013","type":"session.tool.input.started","data":{"sessionID":"sess-beta","assistantMessageID":"msg_b1","id":"call_b1","name":"shell"}}
+{"id":"evt_s014","type":"permission.asked","data":{"id":"per_b1","sessionID":"sess-beta","action":"shell","resource":"example command"}}
+{"id":"evt_s015","type":"session.tool.success","data":{"sessionID":"sess-alpha","assistantMessageID":"msg_a1","id":"call_a1","executed":true}}
+{"id":"evt_s016","type":"session.created","data":{"sessionID":"sess-delta","slug":"sample-delta","title":"Example task","agent":"build","version":"2"}}
+{"id":"evt_s017","type":"session.deleted","data":{"sessionID":"sess-delta"}}
+{"id":"evt_s018","type":"session.usage.updated","data":{"sessionID":"sess-delta"}}
+{"id":"evt_s019","type":"project.updated","data":{}}
+{"id":"evt_s020","type":"some.future.event","data":{"sessionID":"sess-alpha"}}
+{"id":"evt_s021","type":"session.text.delta","data":{"sessionID":"sess-beta","delta":"..."}}
+{"id":"evt_s022","type":"session.text.delta","data":{"sessionID":"sess-alpha","delta":"..."}}

@@ -48,7 +48,7 @@ Explicitly out of scope for the foundation, and not because they are bad ideas:
 - Job history, cost dashboards, analytics.
 - Packaging, installers, auto-update, code signing.
 - Authentication, multi-user, remote access, tunnelling.
-- Parity with the TUI. The TUI remains the tool used for real work in the meantime.
+- Parity with OpenCode's existing frontends — the TUI and the desktop app. The owner keeps working in whichever they already use while this is built.
 - Any change to OpenCode itself.
 - Automatic *cost-optimal* routing. "Free" is answerable from the model catalogue
   (§6.8) and is in scope; anything richer — picking the cheapest paid model, or

@@ -5,6 +5,7 @@ import { createDesk, applyFrame, type Desk } from '../../src/state/desk'
 const d = (): Desk => createDesk('s1')
 const f = (type: string, data: unknown = {}) => ({ type, data })
 const statusOf = (d: Desk) => d.status
+const run = (desk: Desk, ...frames: ReturnType<typeof f>[]) => frames.reduce(applyFrame, desk)
 
 describe('applyFrame — the spec table (§6.3)', () => {
   it('goes working on execution.started', () => {
@@ -24,7 +25,7 @@ describe('applyFrame — the spec table (§6.3)', () => {
   it('goes waiting-on-you on permission.asked and records the id', () => {
     const next = applyFrame(d(), f('permission.asked', { requestID: 'p1' }))
     expect(next.status).toBe('waiting-on-you')
-    expect(next.openPermission).toBe('p1')
+    expect(next.openPermissions).toEqual(['p1'])
   })
   it('goes waiting-on-worker on session.inbox events', () => {
     const next = applyFrame(d(), f('session.inbox.enqueued'))
@@ -52,7 +53,7 @@ describe('applyFrame — precedence and clearing (§6.3)', () => {
     const held = applyFrame(d(), f('permission.asked', { requestID: 'p1' }))
     const after = applyFrame(held, f('permission.replied', { requestID: 'p1' }))
     expect(after.status).toBe('working')
-    expect(after.openPermission).toBeUndefined()
+    expect(after.openPermissions).toEqual([])
   })
   it('ignores a reply for a request it never saw asked', () => {
     const next = applyFrame(d(), f('permission.replied', { requestID: 'never' }))
@@ -83,30 +84,30 @@ describe('applyFrame — the real stream', () => {
   it('reads permission.asked by its real id field, data.id', () => {
     const next = applyFrame(d(), f('permission.asked', { id: 'per_1', sessionID: 's1' }))
     expect(next.status).toBe('waiting-on-you')
-    expect(next.openPermission).toBe('per_1')
+    expect(next.openPermissions).toEqual(['per_1'])
     const after = applyFrame(next, f('permission.replied', { sessionID: 's1', requestID: 'per_1', reply: 'once' }))
     expect(after.status).toBe('working')
-    expect(after.openPermission).toBeUndefined()
+    expect(after.openPermissions).toEqual([])
   })
-  it('keeps the first request when a second is asked while one is open', () => {
+  it('records both requests when a second is asked while one is open', () => {
     const one = applyFrame(d(), f('permission.asked', { id: 'p1' }))
-    expect(applyFrame(one, f('permission.asked', { id: 'p2' })).openPermission).toBe('p1')
+    expect(applyFrame(one, f('permission.asked', { id: 'p2' })).openPermissions).toEqual(['p1', 'p2'])
   })
   it('stays waiting-on-you when a different request is replied', () => {
     const held = applyFrame(d(), f('permission.asked', { id: 'p1' }))
     const next = applyFrame(held, f('permission.replied', { requestID: 'other' }))
     expect(next.status).toBe('waiting-on-you')
-    expect(next.openPermission).toBe('p1')
+    expect(next.openPermissions).toEqual(['p1'])
   })
   it('treats form.created as needs-you, keyed by data.form.id', () => {
     const next = applyFrame(d(), f('form.created', { form: { id: 'frm_1', sessionID: 's1' } }))
     expect(next.status).toBe('waiting-on-you')
-    expect(next.openPermission).toBe('frm_1')
+    expect(next.openPermissions).toEqual(['frm_1'])
   })
   it('clears a form on form.replied or form.cancelled', () => {
     const held = applyFrame(d(), f('form.created', { form: { id: 'frm_1', sessionID: 's1' } }))
     expect(applyFrame(held, f('form.replied', { id: 'frm_1', sessionID: 's1' })).status).toBe('working')
-    expect(applyFrame(held, f('form.cancelled', { id: 'frm_1', sessionID: 's1' })).openPermission).toBeUndefined()
+    expect(applyFrame(held, f('form.cancelled', { id: 'frm_1', sessionID: 's1' })).openPermissions).toEqual([])
   })
   it('goes working on reasoning, which the spec table omits but the stream is mostly made of', () => {
     const next = applyFrame(d(), f('session.reasoning.delta'))
@@ -137,5 +138,34 @@ describe('applyFrame — the real stream', () => {
     const both = applyFrame(asked, f('session.inbox.enqueued'))
     expect(both.status).toBe('waiting-on-you')
     expect(both.waitingOnSibling).toBe(true)
+  })
+})
+
+// §6.3: "A desk tracks every open request, not just the first" — the platform holds
+// several per session and surfaces them one at a time, so clearing must be per id.
+describe('applyFrame — a desk tracks every open request (§6.3)', () => {
+  it('stays needs-you after one of two requests is answered, still naming the other', () => {
+    const both = run(d(), f('permission.asked', { id: 'p1' }), f('permission.asked', { id: 'p2' }))
+    const one = applyFrame(both, f('permission.replied', { requestID: 'p1' }))
+    expect(one.status).toBe('waiting-on-you')
+    expect(one.caption).toBe('needs you')
+    expect(one.openPermissions).toEqual(['p2'])
+  })
+  it('clears once the last request is answered', () => {
+    const both = run(d(), f('permission.asked', { id: 'p1' }), f('permission.asked', { id: 'p2' }))
+    const none = run(both, f('permission.replied', { requestID: 'p1' }), f('permission.replied', { requestID: 'p2' }))
+    expect(none.status).toBe('working')
+    expect(none.openPermissions).toEqual([])
+  })
+  it('leaves the list untouched when the reply names an id that is not on it', () => {
+    const both = run(d(), f('permission.asked', { id: 'p1' }), f('form.created', { form: { id: 'f1' } }))
+    const after = applyFrame(both, f('permission.replied', { requestID: 'ghost' }))
+    expect(after.status).toBe('waiting-on-you')
+    expect(after.openPermissions).toEqual(['p1', 'f1'])
+  })
+  it('removes only the id the reply names, whichever family it belongs to', () => {
+    const both = run(d(), f('permission.asked', { id: 'p1' }), f('form.created', { form: { id: 'f1' } }))
+    expect(applyFrame(both, f('form.cancelled', { id: 'f1' })).openPermissions).toEqual(['p1'])
+    expect(applyFrame(both, f('permission.replied', { requestID: 'p1' })).openPermissions).toEqual(['f1'])
   })
 })

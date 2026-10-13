@@ -20,8 +20,12 @@ describe('settleDesk — §6.3 success/failure fall back to the underlying state
     expect(settleDesk(desk)).toEqual({ ...desk, status: 'waiting-on-worker', caption: 'waiting on another worker' })
   })
   it('settles to waiting-on-you when a permission is open', () => {
-    const desk: Desk = { ...d(), status: 'failure', caption: 'failed', openPermission: 'p1', waitingOnSibling: true }
-    expect(settleDesk(desk)).toMatchObject({ status: 'waiting-on-you', caption: 'needs you', openPermission: 'p1' })
+    const desk: Desk = { ...d(), status: 'failure', caption: 'failed', openPermissions: ['p1'], waitingOnSibling: true }
+    expect(settleDesk(desk)).toMatchObject({ status: 'waiting-on-you', caption: 'needs you', openPermissions: ['p1'] })
+  })
+  it('does not settle a desk that still has an open request', () => {
+    const desk: Desk = { ...d(), status: 'success', caption: 'done', openPermissions: ['p1', 'p2'] }
+    expect(settleDesk(desk)).toMatchObject({ status: 'waiting-on-you', caption: 'needs you', openPermissions: ['p1', 'p2'] })
   })
   it('returns an equal copy of any other desk', () => {
     const working = run(d(), f('session.text.delta'))

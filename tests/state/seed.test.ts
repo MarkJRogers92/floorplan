@@ -12,15 +12,15 @@ describe('seedDesks', () => {
   it('marks a session with an open permission as waiting-on-you — the case events cannot cover', () => {
     const m = seedDesks([{ id: 'a' }], [{ requestID: 'p1', sessionID: 'a' }])
     expect(m.get('a')!.status).toBe('waiting-on-you')
-    expect(m.get('a')!.openPermission).toBe('p1')
+    expect(m.get('a')!.openPermissions).toEqual(['p1'])
   })
 
-  it('keeps the earliest request when a session has several', () => {
+  it('records every request a session has, in snapshot order', () => {
     const m = seedDesks([{ id: 'a' }], [
       { requestID: 'p2', sessionID: 'a' },
       { requestID: 'p1', sessionID: 'a' },
     ])
-    expect(m.get('a')!.openPermission).toBe('p2')
+    expect(m.get('a')!.openPermissions).toEqual(['p2', 'p1'])
   })
 
   it('ignores a permission whose session is not in the snapshot', () => {

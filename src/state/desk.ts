@@ -25,8 +25,18 @@ export type Desk = {
   sessionID: string
   status: DeskStatus
   caption: string
-  /** Set while a permission request is open. Cleared by `permission.replied`. */
-  openPermission?: string
+  /**
+   * Every unanswered request on this desk, oldest first. The desk shows "needs you"
+   * while this is non-empty, and a reply removes only the id it names.
+   *
+   * A list, not a single slot: the platform can hold more than one request for a
+   * session and surface them one at a time, so a single slot would clear the desk
+   * when the first was answered while a second was still unanswered — the exact
+   * sticking §6.3's precedence rules exist to prevent. This is the one sanctioned
+   * change to the frozen declarations; the room reads only `status` (and the count
+   * of desks), so it is unaffected.
+   */
+  openPermissions: string[]
   /** Persists across unrelated events, so clearing a permission restores the wait. */
   waitingOnSibling: boolean
 }
@@ -39,7 +49,7 @@ export type Desk = {
 import type { Frame } from '../api/sse'
 
 export function createDesk(sessionID: string): Desk {
-  return { sessionID, status: 'idle', caption: '', waitingOnSibling: false }
+  return { sessionID, status: 'idle', caption: '', openPermissions: [], waitingOnSibling: false }
 }
 
 type Data = Record<string, unknown>
@@ -83,10 +93,11 @@ const SIBLING_WAIT = 'waiting on another worker'
 /**
  * Fold one frame into one desk. Pure: always returns a new object, never mutates.
  *
- * Precedence (§6.3): an open request outranks everything and is cleared only by the
- * event that settles it — never by our own UI — so anything else that arrives while
- * one is open updates only the persistent sibling flag. Success and failure are held
- * until the next frame that sets a status; no timers live here.
+ * Precedence (§6.3): open requests outrank everything and each is cleared only by the
+ * event that settles it — never by our own UI — so a second request joins the list and
+ * any other frame that arrives while one is open updates only the persistent sibling
+ * flag. Success and failure are held until the next frame that sets a status; no timers
+ * live here.
  */
 export function applyFrame(desk: Desk, frame: Frame): Desk {
   const data = dataOf(frame)
@@ -100,19 +111,31 @@ export function applyFrame(desk: Desk, frame: Frame): Desk {
   if (inboxEnds) waitingOnSibling = false
   else if (t === 'session.inbox.enqueued') waitingOnSibling = true
 
-  if (desk.openPermission !== undefined) {
-    if (settledID(frame, data) === desk.openPermission) {
-      const { openPermission: _settled, ...rest } = desk
-      return waitingOnSibling
-        ? { ...rest, waitingOnSibling, status: 'waiting-on-worker', caption: SIBLING_WAIT }
-        : { ...rest, waitingOnSibling, status: 'working', caption: 'working' }
-    }
-    return { ...desk, waitingOnSibling }
-  }
-
+  // A request raises "needs you" whether or not one is already open; the desk holds
+  // every open id. This is above the open-request branch so a second ask is recorded.
   const asked = askedID(frame, data)
   if (asked !== undefined) {
-    return { ...desk, waitingOnSibling, status: 'waiting-on-you', caption: 'needs you', openPermission: asked }
+    return {
+      ...desk,
+      waitingOnSibling,
+      status: 'waiting-on-you',
+      caption: 'needs you',
+      openPermissions: [...desk.openPermissions, asked],
+    }
+  }
+
+  if (desk.openPermissions.length > 0) {
+    const settled = settledID(frame, data)
+    // A reply clears only the id it names; one that names nothing on the desk is a
+    // no-op, so an unrelated or already-answered request never blanks the desk.
+    if (settled === undefined || !desk.openPermissions.includes(settled)) {
+      return { ...desk, waitingOnSibling }
+    }
+    const rest = desk.openPermissions.filter((id) => id !== settled)
+    if (rest.length > 0) return { ...desk, waitingOnSibling, openPermissions: rest }
+    return waitingOnSibling
+      ? { ...desk, waitingOnSibling, openPermissions: rest, status: 'waiting-on-worker', caption: SIBLING_WAIT }
+      : { ...desk, waitingOnSibling, openPermissions: rest, status: 'working', caption: 'working' }
   }
 
   if (t.startsWith('session.inbox.')) {
@@ -148,7 +171,7 @@ export function applyFrame(desk: Desk, frame: Frame): Desk {
  */
 export function settleDesk(desk: Desk): Desk {
   if (desk.status !== 'success' && desk.status !== 'failure') return { ...desk }
-  if (desk.openPermission !== undefined) return { ...desk, status: 'waiting-on-you', caption: 'needs you' }
+  if (desk.openPermissions.length > 0) return { ...desk, status: 'waiting-on-you', caption: 'needs you' }
   if (desk.waitingOnSibling) return { ...desk, status: 'waiting-on-worker', caption: SIBLING_WAIT }
   return { ...desk, status: 'idle', caption: '' }
 }

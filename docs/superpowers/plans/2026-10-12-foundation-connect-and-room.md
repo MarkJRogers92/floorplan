@@ -831,7 +831,7 @@ Expected: FAIL — cannot resolve `../../src/room/layout`
 
 - [ ] **Step 3: Implement `layout`**
 
-Grid with an 8px padding and a 6px gap; columns = `max(1, floor((bounds.w - 16) / (cell + 6)))`. `shortcut: desks beyond the last visible row are placed off-screen and simply not drawn; add scrolling or paging when a person actually runs more sessions than fit.`
+Grid with an 8px padding and a 4px gap; columns = `max(1, floor((bounds.w - 16) / (cell + 4)))`. `cell` defaults to 48. `shortcut: desks beyond the last visible row are placed off-screen and simply not drawn; add scrolling or paging when a person actually runs more sessions than fit.`
 
 - [ ] **Step 4: Run test to verify it passes**
 

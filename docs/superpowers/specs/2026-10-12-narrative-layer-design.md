@@ -333,10 +333,10 @@ live line against stored beats; an unstored episode cannot be recapped.
 **B-plot** (a guest, intercut; more guests make a montage) · **Tag** (after the root's
 `wrap`/`cut`: callback, title card).
 
-An episode is one root session, opening on `episode-opens`. It ends on the root's
-`wrap`/`cut` with no new `human-asks` on that root within **10 minutes of `created`
-time** (decided by the root's next frame, or at flush), or on `session.deleted`. A
-`human-asks` inside the window is Act 2. A chat resumed later: D2.
+An episode is one root session, opening on `episode-opens`. Under the settled D2
+decision, a resumed chat stays in the same episode regardless of gap length. A root
+`wrap`/`cut` closes an act, not the chat's identity. This supersedes the draft's
+ten-minute episode split; no timeout or end-of-stream invents a new episode.
 
 ## 6. Data model
 

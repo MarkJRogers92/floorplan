@@ -64,7 +64,10 @@ export type SessionInfo = {
   arrived?: boolean
 }
 
-/** A think or a say, open between its first frame and its close. */
+/**
+ * A think or a say, open between its first frame and its close. Its `eventIDs` are the
+ * run's own frames and nothing else — a range the template layer's spans can trust.
+ */
 export type OpenRun = {
   sessionID: string
   kind: 'thinks' | 'says'
@@ -73,13 +76,6 @@ export type OpenRun = {
   /** Deltas only: the frames that carried the worker's actual words. */
   deltas: number
 }
-
-/**
- * The session's `execution.started` frame — the start of its latest turn of work.
- * It raises no beat of its own (§4.1 absorbs it), but the first run raised inside that
- * turn is named there, because a run is named where its work began.
- */
-export type Turn = { id?: string; at: number }
 
 /** The rollup's whole memory. Replaced, never mutated — the reducer stays pure. */
 export type RollupState = {
@@ -95,8 +91,6 @@ export type RollupState = {
   roots: Set<string>
   /** Requests asked and not yet answered, requestID → sessionID: the audience is being asked. */
   pending: Map<string, string>
-  /** Each session's open turn of work, waiting for the first run it names. */
-  turn: Map<string, Turn>
 }
 
 /**

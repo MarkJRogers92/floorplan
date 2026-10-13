@@ -33,7 +33,7 @@ describe('dedupe — a reconnect replays frames we have already seen', () => {
     let s = createRollup()
     const emitted: string[] = []
     for (const fr of frames) { const r = rollup(s, fr); s = r.state; emitted.push(...r.beats.map(x => x.id)) }
-    expect(emitted).toEqual(['b:a'])
+    expect(emitted).toEqual(['b:b'])
     expect(flush(s)).toEqual([])
   })
 
@@ -188,8 +188,8 @@ describe('the rules the tests above leave implicit', () => {
     expect(r.beats[0].detail).toEqual({ kind: 'guest-arrives', childSessionID: 'child' })
   })
 
-  // Finding 1: a beat is named by its FIRST event. Naming the frame that raised it would
-  // give 'b:d' here — this is the test that fails if the id rule goes back.
+  // Finding 1: a beat is named by its FIRST event, and for a run that is the frame that
+  // opened the run — never the frame that closed it, and nothing outside the run.
   it('names a run where it started, never where it closed', () => {
     let s = createRollup()
     const out: Beat[] = []
@@ -200,12 +200,12 @@ describe('the rules the tests above leave implicit', () => {
       f('reasoning.ended', { sessionID: 'x' }, { id: 'd', created: 400 }),
     ]) { const r = rollup(s, fr); s = r.state; out.push(...r.beats) }
     expect(out).toHaveLength(1)
-    expect(out[0].id).toBe('b:a')
-    expect(out[0].at).toBe(100)
-    expect(out[0].eventIDs).toEqual(['a', 'b', 'c', 'd'])
+    expect(out[0].id).toBe('b:b')                  // 'b:d' would be naming the closing frame
+    expect(out[0].at).toBe(200)                    // the run's own first event
+    expect(out[0].eventIDs).toEqual(['b', 'c', 'd']) // 'a' is not part of this run
   })
 
-  it('names a run at its own first frame when we never saw the turn start', () => {
+  it('names a run at its own first frame', () => {
     let s = seedRollup(createRollup(), { sessions: [{ id: 'x' }], permissions: [] })
     const out: Beat[] = []
     for (const fr of [

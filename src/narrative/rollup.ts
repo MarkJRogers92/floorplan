@@ -23,7 +23,7 @@
 
 import type { Frame } from '../api/sse'
 import type {
-  Beat, BeatDetail, BeatKind, NarrativeSnapshot, OpenRun, RollupState, SessionInfo, Turn,
+  Beat, BeatDetail, BeatKind, NarrativeSnapshot, OpenRun, RollupState, SessionInfo,
 } from './types'
 
 type Data = Record<string, unknown>
@@ -79,17 +79,10 @@ const formID = (data: Data): string | undefined => {
 const setSession = (sessions: Map<string, SessionInfo>, info: SessionInfo): Map<string, SessionInfo> =>
   new Map(sessions).set(info.id, info)
 
-const setTurn = (turn: Map<string, Turn>, sessionID: string, value: Turn | undefined): Map<string, Turn> => {
-  const next = new Map(turn)
-  if (value === undefined) next.delete(sessionID)
-  else next.set(sessionID, value)
-  return next
-}
-
 export function createRollup(): RollupState {
   return {
     seenIDs: new Set(), sessions: new Map(), open: new Map(),
-    roots: new Set(), pending: new Map(), turn: new Map(),
+    roots: new Set(), pending: new Map(),
   }
 }
 
@@ -138,7 +131,6 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
   let roots = state.roots
   let open = state.open
   let pending = state.pending
-  let turn = state.turn
   const beats: Beat[] = []
 
   /** A beat raised by this frame alone: its one event is the frame's own. */
@@ -243,7 +235,6 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
   }
 
   if (type === 'execution.succeeded') {
-    turn = setTurn(turn, sessionID, undefined) // the turn is over; the next one opens on its own `execution.started`
     beats.push(raise('wrap', sessionID, { kind: 'wrap' }))
   }
 
@@ -251,23 +242,14 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
   // agrees the session merely stopped — but the story still stops, so it is a cut,
   // carrying the reason.
   if (type === 'execution.failed' || type === 'execution.interrupted') {
-    turn = setTurn(turn, sessionID, undefined)
     beats.push(raise('cut', sessionID, { kind: 'cut', reason: str(data.reason) ?? '' }))
-  }
-
-  // `execution.started` opens the session's turn of work. §4.1 absorbs it — it raises no
-  // beat of its own — but a run is named where its work *began*, so the first run raised
-  // inside this turn takes this frame as its first event (and therefore as its id and its
-  // `at`). Recorded for unknown sessions too: a work stream is a work stream.
-  if (type === 'execution.started' && sessionID !== '') {
-    turn = setTurn(turn, sessionID, { id, at })
   }
 
   // --- runs: a think or a say, from its first frame to its last (§4.1) -------------
   // A run opens on `X.started`, or on the first `X.delta` when we joined mid-run, and
   // closes on `X.ended`. Its beat is emitted at the close, because only then is the delta
-  // count known — but it is *named* where it started: the turn's `execution.started` if the
-  // work began before we saw the run, else the frame that opened it.
+  // count known, but it is named where it started — the frame that opened it, which is
+  // the first event of its range: nothing outside the run joins `eventIDs`.
 
   const part = type.endsWith('.started') ? 'started'
     : type.endsWith('.delta') ? 'delta'
@@ -308,18 +290,14 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
     } else if (id !== undefined) {
       // We joined mid-run: no `X.started` was seen, so this first delta raises the run.
       // A frame with no id cannot — there would be nothing to name the beat by.
-      const opened = turn.get(sessionID)
-      const from = opened !== undefined && opened.id !== undefined ? opened : undefined
-      if (from !== undefined) turn = setTurn(turn, sessionID, undefined) // spent on this run
-      const eventIDs = from === undefined ? [id] : [from.id as string, id]
       open = new Map(open).set(key, {
-        sessionID, kind: runKind, at: from?.at ?? at, eventIDs,
+        sessionID, kind: runKind, at, eventIDs: [id],
         deltas: part === 'delta' ? 1 : 0,
       })
     }
   }
 
-  return { state: { seenIDs, sessions, open, roots, pending, turn }, beats }
+  return { state: { seenIDs, sessions, open, roots, pending }, beats }
 }
 
 /**

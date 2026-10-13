@@ -77,6 +77,7 @@ built; they were deferred and are the remaining part of the spec's "done means".
 | `src/narrative/scope.ts`, `series.ts`, `bible.ts` | project identity, additive archive validation and evidence-backed character statistics |
 | `server/series-store.ts`, `src/dev/series-route.ts`, `http-guard.ts` | private atomic local files and guarded loopback archive/context routes |
 | `src/app/series-client.ts` | nonblocking live milestone saves, read-through context and visible storage status; no replay saves |
+| `src/app/cast-memory.ts` | validated displayed-context projection and current-cast memory cards; no fabricated identities or recap lines |
 | `src/room/{layout,room}.ts` | pure geometry, then canvas drawing |
 | `src/app/floor.ts` | `createFloor` — the object the page owns |
 | `src/main.ts`, `index.html` | the page — script primary column, floor panel beside it |
@@ -205,11 +206,24 @@ unverified. Existing cache lifetime/lifecycle/DOM/cast limits and identity-lengt
 remain unchanged, with refusal/template fallback rather than guessed evidence.
 
 **Continuity deferred minors:** cumulative2MiB/10,000-beat episode limit stops later
-saves while keeping prior history; read-through cache has no page consumer yet (extra
-local GET); conflict/full diagnostics can overgeneralize validation errors; crash-left
+saves while keeping prior history; conflict/full diagnostics can overgeneralize validation errors; crash-left
 temp files, stale-lock UI guidance and extra per-frame scene/grouping work need focused
 follow-up. Success already clears its failed-snapshot marker; the review's contrary
 claim was checked against `failed.delete(id)`, not accepted as a bug.
+
+**Cast memory follow-up:** live episodes now consume read-through context in a collapsed
+native disclosure, labeling saved personas as invented with their exact stored debut,
+and displaying previous archived episode IDs. Cache identity includes project AND root;
+initial/agent-change reads and save refreshes are independent of writing, and late,
+superseded or replay/reset results are discarded. The page only displays current known
+agents, projects displayed fields from validated context, uses textContent, preserves
+open disclosure state across script rebuilds, and keeps empty/replay memory absent.
+No dependencies/provider calls/archive edits/art changes. Synthetic real-page browser
+checks verified two-root isolation, literal markup-like agent names, invented labels,
+debut references, open-state persistence, and replay with no new GET/POST or cards.
+The follow-up baseline is405 tests/41 files with typecheck/build clean; private server
+data remains absent from the browser bundle. Browser boundaries were synthetic and
+no archive/provider calls were made by the test harness; by-eye appearance is unverified.
 
 Recaps, plot labels and staged visuals remain next. Before extending episode lifecycle, read the slice-2 execution notes;
 that plan's original timeout contradicted D2 and was not implemented.

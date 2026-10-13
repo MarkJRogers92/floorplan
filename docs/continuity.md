@@ -16,6 +16,14 @@ Replays do not autosave, so test or incomplete recordings cannot pollute live hi
 Their Director requests also omit durable series identity: an opted-in replay may
 narrate current footage, but cannot archive it or create a persona through that route.
 
+Live episodes have an optional, collapsed **Cast memory** disclosure. It shows the
+current real cast's saved “Invented persona” with its stored debut reference and
+“Previous appearances” as archived episode IDs, excluding the current chat. Empty,
+unknown-scope and replay memory stays hidden. These are local archive references,
+not new story lines, work claims or a replay/quote browser. Reads begin when root
+scope/cast is known, without waiting for a save; two chats in one project have distinct
+root-excluding caches. Failed/superseded reads cannot delay saving or narration.
+
 Saving a rejoined partial episode is additive: old beats remain, repeated IDs are
 counted once, and genuinely conflicting immutable beats refuse the entire update.
 Corrupt files, unsafe symlinks, stale locks and full archives are reported, never

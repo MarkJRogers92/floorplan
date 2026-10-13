@@ -24,7 +24,7 @@ it('saves only live scene milestones, then caches local context without re-savin
   await tick()
   expect(posts[0].beats.map((b: Beat) => b.id)).toEqual(['a', 'b'])
   expect(client.status()).toContain('saved')
-  expect(client.contexts().get(sessions[0].seriesKey)?.episodeCount).toBe(1)
+  expect(client.contextFor(sessions[0].seriesKey, 'root')?.episodeCount).toBe(1)
   client.update([beat('a'), beat('b', 'wrap')], sessions)
   await tick(); expect(posts).toHaveLength(1)
 })
@@ -77,7 +77,7 @@ it('reset/replay rejects late storage acknowledgements and aborts the request', 
   release(Response.json({ saved: true, episodeCount: 1 }))
   await tick()
   expect(client.status()).toContain('replay')
-  expect(client.contexts().size).toBe(0)
+  expect(client.contextFor(sessions[0].seriesKey, 'root')).toBeUndefined()
 })
 it('a capped ninety-second scene is a save milestone without a later frame', async () => {
   let posts = 0
@@ -98,7 +98,7 @@ it('switching directly to replay also invalidates a pending live acknowledgement
   release(Response.json({ saved: true, episodeCount: 1 }))
   await tick()
   expect(client.status()).toContain('replay')
-  expect(client.contexts().size).toBe(0)
+  expect(client.contextFor(sessions[0].seriesKey, 'root')).toBeUndefined()
 })
 it('retries a failed terminal save without another frame, preserving all tail evidence', async () => {
   const posts: any[] = []
@@ -135,7 +135,10 @@ it('a retry coalesces to newer cumulative evidence instead of restoring the fail
 })
 it('switching to replay cancels a failed live save retry', async () => {
   let posts = 0
-  const client = createSeriesClient(async () => { posts++; throw new Error('offline') })
+  const client = createSeriesClient(async (_, options) => {
+    if (options?.method !== 'POST') return Response.json(context)
+    posts++; throw new Error('offline')
+  })
   client.update([beat('a', 'wrap')], sessions)
   await tick()
   client.update([beat('a', 'wrap')], sessions, true)
@@ -145,7 +148,10 @@ it('switching to replay cancels a failed live save retry', async () => {
 })
 it('a permanently unavailable static-build route is not retried automatically', async () => {
   let posts = 0
-  const client = createSeriesClient(async () => { posts++; return new Response('', { status: 404 }) })
+  const client = createSeriesClient(async (_, options) => {
+    if (options?.method !== 'POST') return Response.json(context)
+    posts++; return new Response('', { status: 404 })
+  })
   client.update([beat('a', 'wrap')], sessions)
   await tick()
   await vi.advanceTimersByTimeAsync(60_000)
@@ -167,4 +173,123 @@ it('retries the mounted route unavailable error but leaves an immutable conflict
     expect(posts, code).toBe(expectedPosts)
     client.reset()
   }
+})
+it('reads scoped cast context before a milestone, without POST or repeated GETs', async () => {
+  const gets: string[] = []
+  const client = createSeriesClient(async (url, options) => {
+    expect(options?.method).not.toBe('POST')
+    gets.push(String(url)); return Response.json(context)
+  })
+  client.update([], sessions)
+  await tick()
+  expect(gets).toHaveLength(1)
+  expect(new URL(gets[0], 'http://local').searchParams.get('root')).toBe('root')
+  expect(client.contextFor(sessions[0].seriesKey, 'root')?.episodeCount).toBe(1)
+  expect(client.status()).not.toContain('saved')
+  client.update([beat('a')], sessions)
+  await tick(); expect(gets).toHaveLength(1)
+})
+it('two live roots in one project cache their own root-excluding context', async () => {
+  const client = createSeriesClient(async url => {
+    const root = new URL(String(url), 'http://local').searchParams.get('root')
+    return Response.json({ ...context, bibles: [{ agent: 'build', episodes: [root === 'root' ? 'ep:other' : 'ep:root'] }] })
+  })
+  client.update([], [...sessions, { ...sessions[0], id: 'other' }])
+  await tick()
+  expect(client.contextFor(sessions[0].seriesKey, 'root')?.bibles[0].episodes).toEqual(['ep:other'])
+  expect(client.contextFor(sessions[0].seriesKey, 'other')?.bibles[0].episodes).toEqual(['ep:root'])
+})
+it('an agent change aborts the old read and rejects its late reply', async () => {
+  let release!: (v: Response) => void
+  let oldSignal!: AbortSignal
+  const wait = new Promise<Response>(r => { release = r })
+  let calls = 0
+  const client = createSeriesClient(async (_, options) => {
+    calls++
+    if (calls === 1) { oldSignal = options!.signal as AbortSignal; return wait }
+    return Response.json({ ...context, bibles: [{ agent: 'explore', episodes: ['ep:old'] }] })
+  })
+  client.update([], sessions)
+  client.update([], [{ ...sessions[0], agent: 'explore' }])
+  await tick(); expect(oldSignal.aborted).toBe(true)
+  release(Response.json({ ...context, bibles: [{ agent: 'build', episodes: ['ep:stale'] }] }))
+  await tick()
+  expect(client.contextFor(sessions[0].seriesKey, 'root')?.bibles[0].agent).toBe('explore')
+})
+it('slow or failed context never delays or retries an acknowledged save', async () => {
+  let release!: (v: Response) => void
+  const wait = new Promise<Response>(r => { release = r })
+  let posts = 0
+  const client = createSeriesClient(async (_, options) => {
+    if (options?.method !== 'POST') return wait
+    posts++; return Response.json({ saved: true, episodeCount: 1 })
+  })
+  client.update([beat('end', 'wrap')], sessions)
+  await tick()
+  expect(posts).toBe(1)
+  expect(client.status()).toContain('saved')
+  release(new Response('', { status: 503 }))
+  await tick(); await vi.advanceTimersByTimeAsync(60_000)
+  expect(posts).toBe(1)
+  expect(client.status()).toContain('context unavailable')
+})
+it('replay aborts a pending read and clears history without any POST', async () => {
+  let release!: (v: Response) => void
+  let signal!: AbortSignal
+  const wait = new Promise<Response>(r => { release = r })
+  const client = createSeriesClient(async (_, options) => {
+    expect(options?.method).not.toBe('POST')
+    signal = options!.signal as AbortSignal; return wait
+  })
+  client.update([], sessions)
+  client.update([], sessions, true)
+  expect(signal.aborted).toBe(true)
+  release(Response.json(context))
+  await tick()
+  expect(client.contextFor(sessions[0].seriesKey, 'root')).toBeUndefined()
+  expect(client.status()).toContain('replay')
+})
+it('losing a known agent cancels its pending read without guessing another identity', async () => {
+  let release!: (v: Response) => void
+  let signal!: AbortSignal
+  const wait = new Promise<Response>(r => { release = r })
+  const client = createSeriesClient(async (_, options) => { signal = options!.signal as AbortSignal; return wait })
+  client.update([], sessions)
+  client.update([], [{ ...sessions[0], agent: undefined }])
+  expect(signal.aborted).toBe(true)
+  release(Response.json(context)); await tick()
+  expect(client.contextFor(sessions[0].seriesKey, 'root')).toBeUndefined()
+})
+it('an older save acknowledgement cannot refresh a superseded agent list', async () => {
+  let release!: (v: Response) => void
+  const wait = new Promise<Response>(r => { release = r })
+  const reads: string[] = []
+  let posts = 0
+  const client = createSeriesClient(async (url, options) => {
+    if (options?.method === 'POST') {
+      posts++; return posts === 1 ? wait : Response.json({ saved: true, episodeCount: 1 })
+    }
+    const agent = new URL(String(url), 'http://local').searchParams.get('agent')!
+    reads.push(agent)
+    return Response.json({ ...context, bibles: [{ agent, episodes: ['ep:old'] }] })
+  })
+  client.update([beat('end', 'wrap')], sessions)
+  client.update([beat('end', 'wrap')], [{ ...sessions[0], agent: 'explore' }])
+  await tick()
+  release(Response.json({ saved: true, episodeCount: 1 })); await tick()
+  expect(reads).toEqual(['build', 'explore', 'explore'])
+  expect(client.contextFor(sessions[0].seriesKey, 'root')?.bibles[0].agent).toBe('explore')
+})
+it('a successful later read clears its unavailable status without claiming a save', async () => {
+  let calls = 0
+  const client = createSeriesClient(async () => {
+    calls++
+    if (calls === 1) throw new Error('offline')
+    return Response.json(context)
+  })
+  client.update([], sessions); await tick()
+  expect(client.status()).toContain('context unavailable')
+  client.update([], [{ ...sessions[0], agent: 'explore' }]); await tick()
+  expect(client.status()).not.toContain('unavailable')
+  expect(client.status()).not.toContain('saved')
 })

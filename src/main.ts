@@ -5,7 +5,9 @@ import { streamFrames } from './api/stream'
 import { createFloor } from './app/floor'
 import { directorCall, parseDirectorState } from './app/director-client'
 import { createSeriesClient } from './app/series-client'
-import { scopeFromSnapshot } from './narrative/scope'
+import { castMemoryCards } from './app/cast-memory'
+import { scopeFromSnapshot, seriesKeyForRoot } from './narrative/scope'
+import { rootFor } from './narrative/cast'
 import type { DirectorState } from './narrative/director'
 import { createDirectorRuntime } from './narrative/director-runtime'
 import { createRollup, flush as flushRollup, rollup as rollFrame, seedRollup } from './narrative/rollup'
@@ -54,7 +56,10 @@ let replaying = false
 let directorEnabled = false
 let directorState: DirectorState | null = null
 const excludedChats = new Set<string>()
-const history = createSeriesClient(fetch, () => { historyStatus.textContent = history.status() })
+const history = createSeriesClient(fetch, () => {
+  historyStatus.textContent = history.status()
+  renderNarrative()
+})
 const director = createDirectorRuntime((request, signal) => directorCall('scene', request, signal), () => {
   renderNarrative()
   void refreshDirectorState()
@@ -158,12 +163,49 @@ function narrate(arrived: Beat[], flushed = false) {
 }
 
 function renderNarrative() {
+  const openMemory = new Set([...scriptEl.querySelectorAll<HTMLDetailsElement>('details[data-memory]')]
+    .filter(d => d.open).map(d => d.dataset.memory))
+  const sessions = [...rollState.sessions.values()]
+  const index = rollState.sessions
   const content = document.createDocumentFragment()
-  for (const view of assembleEpisodeViews(beats, [...rollState.sessions.values()], director.results())) {
+  for (const view of assembleEpisodeViews(beats, sessions, director.results())) {
     const episode = document.createElement('section')
     episode.dataset.episode = view.episode.id
     episode.append(scriptRow(view.heading, 'episode'))
     episode.append(chatOptOut(view.episode.rootSessionID))
+    const root = view.episode.rootSessionID
+    const key = seriesKeyForRoot(root, sessions)
+    const agents = sessions.filter(s => rootFor(s.id, index) === root).flatMap(s => s.agent ? [s.agent] : [])
+    const cards = !replaying && key ? castMemoryCards(history.contextFor(key, root), agents) : []
+    if (cards.length) {
+      const memory = document.createElement('details')
+      memory.className = 'cast-memory'
+      memory.dataset.memory = JSON.stringify([key, root])
+      memory.open = openMemory.has(memory.dataset.memory)
+      const summary = document.createElement('summary')
+      summary.textContent = 'Cast memory'
+      memory.append(summary)
+      for (const card of cards) {
+        const entry = document.createElement('div')
+        const name = document.createElement('strong')
+        name.textContent = card.agent
+        entry.append(name)
+        if (card.persona) {
+          const fiction = document.createElement('p')
+          fiction.textContent = `Invented persona: ${card.persona.text}`
+          const proof = document.createElement('small')
+          proof.textContent = `Stored debut: ${card.persona.debut.episodeID} · ${card.persona.debut.beatID}`
+          entry.append(fiction, proof)
+        }
+        if (card.episodes.length) {
+          const appearances = document.createElement('p')
+          appearances.textContent = `Previous appearances: ${card.episodes.join(', ')}`
+          entry.append(appearances)
+        }
+        memory.append(entry)
+      }
+      episode.append(memory)
+    }
     for (const group of view.scenes) {
       const scene = document.createElement('section')
       scene.dataset.scene = group.scene.id
@@ -236,6 +278,7 @@ async function seedFromREST(service: Service) {
     })),
     permissions: requests,
   })
+  narrate([])
   draw()
 }
 

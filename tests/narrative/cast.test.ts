@@ -16,4 +16,10 @@ describe('castFor', () => {
     expect(castFor([{ id: 's1' }])('s1')).toBe('unidentified')
     expect(castFor([])('gone')).toBe('unidentified')
   })
+
+  it('never suffixes an unidentified session', () => {
+    const cast = castFor([{ id: 's1' }, { id: 's2' }])
+    expect(cast('s1')).toBe('unidentified')
+    expect(cast('s2')).toBe('unidentified')
+  })
 })

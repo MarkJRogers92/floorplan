@@ -11,10 +11,10 @@ type Session = { id: string; agent?: string }
 export function castFor(sessions: Session[]): (sessionID: string) => CastID {
   const byAgent = new Map<string, string[]>()
   for (const s of sessions) {
-    const agent = s.agent ?? 'unidentified'
-    const list = byAgent.get(agent) ?? []
+    if (s.agent === undefined) continue
+    const list = byAgent.get(s.agent) ?? []
     list.push(s.id)
-    byAgent.set(agent, list)
+    byAgent.set(s.agent, list)
   }
 
   const map = new Map<string, CastID>()

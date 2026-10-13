@@ -40,6 +40,14 @@ describe('slots render from their cites, and only from them', () => {
   it('rejects a line with no cites', () => {
     expect(renderLine(line('Nothing happened.', []), beats, ctx)).toHaveProperty('rejected')
   })
+
+  it('rejects a before slot when the order is reversed', () => {
+    expect(renderLine(line('{before:b:2,b:1}', ['b:1', 'b:2']), beats, ctx)).toHaveProperty('rejected')
+  })
+
+  it('rejects an again slot across different beat kinds', () => {
+    expect(renderLine(line('{again:b:1,b:3}', ['b:1', 'b:3']), beats, ctx)).toHaveProperty('rejected')
+  })
 })
 
 describe('delivery — the viewer can always tell real words from written ones', () => {

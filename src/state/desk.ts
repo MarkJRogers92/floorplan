@@ -70,7 +70,8 @@ function settledID(frame: Frame, data: Data): string | undefined {
 
 /** Event families that mean the worker is busy, and the caption each gives. */
 const ACTIVITY: ReadonlyArray<[RegExp, string | null]> = [
-  [/^session\.compaction\./, 'compacting'],
+  [/^session\.compaction\.(started|delta)$/, 'compacting'],
+  [/^session\.compaction\.(ended|failed)$/, 'working'], // compaction over: drop the 'compacting' caption
   [/^session\.reasoning\./, 'thinking'],
   [/^session\.text\./, 'writing'],
   [/^session\.(tool|step|shell)\./, null], // null: keep the current activity caption
@@ -93,8 +94,11 @@ export function applyFrame(desk: Desk, frame: Frame): Desk {
 
   // Sibling-wait bookkeeping happens whatever is showing, so it is right afterwards.
   let waitingOnSibling = desk.waitingOnSibling
-  if (t === 'session.inbox.delivered' || t === 'session.inbox.cancelled') waitingOnSibling = false
-  else if (t.startsWith('session.inbox.')) waitingOnSibling = true
+  // Only `enqueued` starts a wait and only `delivered`/`cancelled` end one; any other
+  // inbox member (such as `delivery.changed`) leaves the flag and the status alone.
+  const inboxEnds = t === 'session.inbox.delivered' || t === 'session.inbox.cancelled'
+  if (inboxEnds) waitingOnSibling = false
+  else if (t === 'session.inbox.enqueued') waitingOnSibling = true
 
   if (desk.openPermission !== undefined) {
     if (settledID(frame, data) === desk.openPermission) {
@@ -112,6 +116,7 @@ export function applyFrame(desk: Desk, frame: Frame): Desk {
   }
 
   if (t.startsWith('session.inbox.')) {
+    if (t !== 'session.inbox.enqueued' && !inboxEnds) return { ...desk }
     if (waitingOnSibling) return { ...desk, waitingOnSibling, status: 'waiting-on-worker', caption: SIBLING_WAIT }
     // The wait ended. If it was what we were showing, the input has landed: working.
     return desk.status === 'waiting-on-worker'
@@ -121,6 +126,8 @@ export function applyFrame(desk: Desk, frame: Frame): Desk {
 
   if (t === 'session.execution.succeeded') return { ...desk, status: 'success', caption: 'done' }
   if (t === 'session.execution.failed') return { ...desk, status: 'failure', caption: 'failed' }
+  // OpenCode's own reducer does not count a shutdown as a failure: the session just stopped.
+  if (t === 'session.execution.interrupted' && data.reason === 'shutdown') return { ...desk, status: 'idle', caption: '' }
   if (t === 'session.execution.interrupted') return { ...desk, status: 'failure', caption: 'interrupted' }
 
   for (const [pattern, caption] of ACTIVITY) {
@@ -131,4 +138,17 @@ export function applyFrame(desk: Desk, frame: Frame): Desk {
   }
 
   return { ...desk } // unknown or not ours to act on (§7 R2): a no-op, never an error
+}
+
+/**
+ * §6.3: success and failure "hold briefly, then fall back to the session's underlying
+ * state". This is the fall-back; the hold is the caller's (a timer in the page), so
+ * this stays pure. An open request wins, then a recorded sibling wait, else idle. Any
+ * desk not showing success or failure comes back as an equal copy.
+ */
+export function settleDesk(desk: Desk): Desk {
+  if (desk.status !== 'success' && desk.status !== 'failure') return { ...desk }
+  if (desk.openPermission !== undefined) return { ...desk, status: 'waiting-on-you', caption: 'needs you' }
+  if (desk.waitingOnSibling) return { ...desk, status: 'waiting-on-worker', caption: SIBLING_WAIT }
+  return { ...desk, status: 'idle', caption: '' }
 }

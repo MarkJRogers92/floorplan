@@ -36,16 +36,30 @@ process.on('SIGINT', () => {
 })
 
 console.log(`recording ${service.url}/api/event → ${file}  (Ctrl-C to stop)`)
+// A failure to write the recording (ENOSPC, EIO, ...) is ours, not the stream's: tag it
+// so it is not reported as a stream failure, and stop the stream so nothing is lost silently.
+class RecordingError extends Error {}
+
 try {
   await streamFrames(service, '/api/event', frame => {
-    record(frame)
+    try {
+      record(frame)
+    } catch (err) {
+      abort.abort()
+      throw new RecordingError((err as Error).message)
+    }
     count++
     console.log(frame.type)
   }, abort.signal)
   finish('stream ended')
 } catch (err) {
+  // Neither message ever contains the password: one names a filesystem error, the
+  // other a status code or a connection failure.
+  if (err instanceof RecordingError) {
+    console.error(`could not write the recording to ${file}: ${err.message}`)
+    process.exit(1)
+  }
   if (abort.signal.aborted) finish('stopped')
-  // The message names a status code or a connection failure; it never contains the password.
   console.error(`could not read the event stream at ${service.url}: ${(err as Error).message}`)
   process.exit(1)
 }

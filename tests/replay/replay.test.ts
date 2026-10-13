@@ -62,3 +62,16 @@ describe('replay', () => {
     expect(seen).toEqual(['a'])
   })
 })
+
+describe('replay — abort during the step delay (review fix 2)', () => {
+  it('resolves promptly when aborted mid-delay', async () => {
+    const f = write(['{"type":"a","data":{}}', '{"type":"b","data":{}}'].join('\n'))
+    const abort = new AbortController()
+    const seen: string[] = []
+    const start = Date.now()
+    setTimeout(() => abort.abort(), 10)
+    await replay(f, x => seen.push(x.type), 1000, abort.signal)
+    expect(Date.now() - start).toBeLessThan(200)
+    expect(seen).toEqual(['a'])
+  })
+})

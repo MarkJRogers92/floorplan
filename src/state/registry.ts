@@ -7,6 +7,11 @@ import { applyFrame, createDesk, type Desk } from './desk'
  * but the plan's interface passes only the `Map`. So each map we return carries its
  * set here, keyed weakly so a dropped map takes its tombstones with it. A map we did
  * not make (a fresh one, or one from `seedDesks`) simply has none yet.
+ *
+ * Two consequences. Tombstones belong to the exact map object we returned, so a caller
+ * that copies it (`new Map(m)`) loses them and a straggler could resurrect a deleted
+ * desk; always pass back the map `ingest` returned. And the set only grows: every
+ * deleted session id stays in it for the life of the registry.
  */
 const tombstones = new WeakMap<Map<string, Desk>, ReadonlySet<string>>()
 

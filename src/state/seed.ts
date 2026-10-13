@@ -6,6 +6,10 @@ export type SessionSnapshot = { id: string; active?: boolean }
 /**
  * One open request from `GET /api/permission/request`. OpenCode returns these keyed
  * by `id`; the caller maps that to `requestID` here, the name `permission.replied` uses.
+ *
+ * Open forms (`GET /api/form`) can be seeded the same way: pass
+ * `{ requestID: form.id, sessionID }`. `form.replied` and `form.cancelled` settle by
+ * that same id, so the desk clears exactly as it would for a streamed `form.created`.
  */
 export type PermissionRequest = { requestID: string; sessionID: string }
 

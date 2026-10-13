@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import type { Frame } from '../api/sse'
 import { parseRecording } from './parse'
+import { replayFrames } from './play'
 
 /** Read a recording from disk. Node-only; the parsing itself is `parseRecording`. */
 export function readFrames(file: string): Frame[] {
@@ -8,9 +9,10 @@ export function readFrames(file: string): Frame[] {
 }
 
 /**
- * Emit a recording's frames one at a time, `stepMs` apart, so the room visibly
- * evolves. Feed `onFrame` into the same registry the live stream uses. Resolves early,
- * without throwing, once `signal` aborts.
+ * Node wrapper: read a recording from disk and play it with `replayFrames`. Feed
+ * `onFrame` into the same registry the live stream uses. Resolves early, without
+ * throwing, once `signal` aborts. The page imports `replayFrames` from `./play`
+ * directly, never this module.
  */
 export async function replay(
   file: string,
@@ -18,11 +20,5 @@ export async function replay(
   stepMs = 250,
   signal?: AbortSignal,
 ): Promise<void> {
-  const frames = readFrames(file)
-  for (let i = 0; i < frames.length; i++) {
-    if (signal?.aborted) return
-    if (i > 0 && stepMs > 0) await new Promise(r => setTimeout(r, stepMs))
-    if (signal?.aborted) return
-    onFrame(frames[i])
-  }
+  return replayFrames(readFrames(file), onFrame, stepMs, signal)
 }

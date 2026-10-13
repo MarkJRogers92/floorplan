@@ -62,6 +62,54 @@ describe('silence', () => {
     const silence = beats.find(b => b.kind === 'silence')
     expect(silence!.detail).toEqual({ kind: 'silence', fromEventID: 'c', toEventID: 'd' })
   })
+
+  it('does not share its id with the beat the ending frame itself raises', () => {
+    // A silence named by the ending frame's id would collide with the beat that
+    // frame may itself raise. Here the ending frame is a `permission.asked` —
+    // it raises a `knocks` beat — and the silence must keep its own id so the
+    // two are distinct. (§4.1: "an opener and its beat must never share an id";
+    // that rule generalises to every pair of beats.)
+    const { beats } = drive([
+      f('execution.started', { sessionID: 'x' }, { id: 'a', created: 0 }),
+      f('text.started', { sessionID: 'x' }, { id: 'b', created: 1000 }),
+      f('text.ended', { sessionID: 'x' }, { id: 'c', created: 2000 }),
+      f('permission.asked', { sessionID: 'x', id: 'p1' }, { id: 'd', created: 40000 }),
+    ])
+    const kinds = beats.map(b => b.kind)
+    expect(kinds).toContain('silence')
+    expect(kinds).toContain('knocks')
+    const ids = beats.map(b => b.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    const silence = beats.find(b => b.kind === 'silence')!
+    const knocks = beats.find(b => b.kind === 'knocks')!
+    expect(silence.id).not.toBe(knocks.id)
+  })
+
+  it('does the same when the ending frame is a wrap', () => {
+    // Same collision check via a different beat-raising frame type: `wrap`.
+    const { beats } = drive([
+      f('execution.started', { sessionID: 'x' }, { id: 'a', created: 0 }),
+      f('text.started', { sessionID: 'x' }, { id: 'b', created: 1000 }),
+      f('text.ended', { sessionID: 'x' }, { id: 'c', created: 2000 }),
+      f('execution.succeeded', { sessionID: 'x' }, { id: 'd', created: 40000 }),
+    ])
+    const kinds = beats.map(b => b.kind)
+    expect(kinds).toContain('silence')
+    expect(kinds).toContain('wrap')
+    const ids = beats.map(b => b.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('does not narrate a pre-start gap for a session we watched from created', () => {
+    // A `session.created` we saw is not "joined" — the session is not working
+    // until its `execution.started`. A 45 s gap from `created` to a non-start
+    // frame must not raise a silence.
+    const { beats } = drive([
+      f('session.created', { sessionID: 'x' }, { id: 'a', created: 0 }),
+      f('inbox.enqueued', { sessionID: 'x', item: { type: 'user' } }, { id: 'b', created: 45000 }),
+    ])
+    expect(beats.some(b => b.kind === 'silence')).toBe(false)
+  })
 })
 
 describe('flush', () => {

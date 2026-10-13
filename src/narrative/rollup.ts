@@ -29,7 +29,7 @@ import type {
   Beat, BeatDetail, BeatKind, NarrativeSnapshot, OpenRun, RollupState, SessionInfo,
 } from './types'
 import { findGuestCall, foldCall } from './calls'
-import { checkSilence, nextWorking, updateTrack } from './silence'
+import { beatID, checkSilence, nextWorking, updateTrack } from './silence'
 
 type Data = Record<string, unknown>
 
@@ -39,13 +39,6 @@ const num = (v: unknown): number | undefined =>
 const dataOf = (frame: Frame): Data =>
   typeof frame.data === 'object' && frame.data !== null ? (frame.data as Data) : {}
 
-/**
- * A beat's name: its first event's id, so the beat is named where it started and a
- * replay names it the same. Only a beat whose first event has no id at all — reachable
- * only from a frame handed to us without one — takes the fallback.
- */
-const beatID = (eventIDs: string[], kind: BeatKind, sessionID: string, at: number): string =>
-  eventIDs[0] !== undefined ? `b:${eventIDs[0]}` : `b:${kind}:${sessionID}:${at}`
 
 /**
  * OpenCode prefixes session frames (`session.execution.started`) and the spec writes
@@ -126,8 +119,8 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
   const beats: Beat[] = []
 
   // The current session's "working" state, after this frame is processed. Starts
-  // from whatever the prior track said, and §4.1's transitions (start/wrap/cut)
-  // and the "first frame starts it working" rule set it here.
+  // from whatever the prior track said, and §4.1's transitions (start/wrap/cut
+  // and the joined-first-frame rule) set it here. The rule lives in silence.ts.
   const priorTrack = sessionID === '' ? undefined : state.tracks.get(sessionID)
   let working = priorTrack?.working === true
 

@@ -29,6 +29,7 @@ import type {
   Beat, BeatDetail, BeatKind, NarrativeSnapshot, OpenRun, RollupState, SessionInfo,
 } from './types'
 import { findGuestCall, foldCall } from './calls'
+import { checkSilence, nextWorking, updateTrack } from './silence'
 
 type Data = Record<string, unknown>
 
@@ -71,7 +72,7 @@ const setSession = (sessions: Map<string, SessionInfo>, info: SessionInfo): Map<
 export function createRollup(): RollupState {
   return {
     seenIDs: new Set(), sessions: new Map(), open: new Map(), calls: new Map(),
-    roots: new Set(), pending: new Map(),
+    roots: new Set(), pending: new Map(), tracks: new Map(),
   }
 }
 
@@ -121,13 +122,25 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
   let open = state.open
   let calls = state.calls
   let pending = state.pending
+  let tracks = state.tracks
   const beats: Beat[] = []
+
+  // The current session's "working" state, after this frame is processed. Starts
+  // from whatever the prior track said, and §4.1's transitions (start/wrap/cut)
+  // and the "first frame starts it working" rule set it here.
+  const priorTrack = sessionID === '' ? undefined : state.tracks.get(sessionID)
+  let working = priorTrack?.working === true
 
   /** A beat raised by this frame alone: its one event is the frame's own. */
   const raise = (kind: BeatKind, subject: string, detail: BeatDetail): Beat => {
     const eventIDs = id === undefined ? [] : [id]
     return { id: beatID(eventIDs, kind, subject, at), at, eventIDs, kind, sessionID: subject, detail }
   }
+
+  // §4.1 silence — checked at entry, before this frame is processed, so the working
+  // state is the prior frame's and the from-side bounding frame is already in the track.
+  const silence = checkSilence({ sessionID, at, id, tracks, pending, calls })
+  if (silence !== undefined) beats.push(silence)
 
   /**
    * §4.1: an episode opens on the root's `session.created`, its `execution.started` when
@@ -254,6 +267,10 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
     beats.push(raise('cut', sessionID, { kind: 'cut', reason: str(data.reason) ?? '' }))
   }
 
+  // §4.1 working-flag transitions are centralised in silence.ts; the track update
+  // runs last so the *next* frame's silence check sees the post-process state.
+  working = nextWorking({ sessionID, type, prior: priorTrack, working })
+
   // --- calls: tool uses and subagent guests, joined by the call's id (§4.1) --------
   const callResult = foldCall({ calls, frame, sessionID, at, openEpisode, beatID })
   calls = callResult.calls
@@ -313,7 +330,14 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
     }
   }
 
-  return { state: { seenIDs, sessions, open, calls, roots, pending }, beats }
+  // --- the session's working track, updated last so it reflects the post-process state
+  // A session joined mid-stream (or never seen) becomes working on its first frame, so
+  // a future gap is eligible. `lastAt`/`lastEventID` are this frame's, so the next
+  // silence is measured against the right boundary. An id-less frame advances `lastAt`
+  // but not `lastEventID`: a silence needs a real id on the from side to cite.
+  tracks = updateTrack({ tracks, sessionID, frame, at, id, working })
+
+  return { state: { seenIDs, sessions, open, calls, roots, pending, tracks }, beats }
 }
 
 /**

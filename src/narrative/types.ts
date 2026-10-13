@@ -97,6 +97,20 @@ export type OpenCall = {
   exit?: number
 }
 
+/**
+ * Per-session "working" tracking for §4.1's silence rule: the last frame we saw
+ * from this session and whether it is currently working — after its first frame
+ * (or `execution.started`) and before its `wrap`/`cut`.
+ */
+export type SessionTrack = {
+  /** `created` of the last frame from this session, or undefined if none yet. */
+  lastAt?: number
+  /** id of that frame, or undefined if the frame had no id (then a silence has no fromEventID to cite). */
+  lastEventID?: string
+  /** After the session's first frame (or execution.started), before its wrap/cut. */
+  working: boolean
+}
+
 /** The rollup's whole memory. Replaced, never mutated — the reducer stays pure. */
 export type RollupState = {
   /** Every event id already folded in: a reconnect replays frames we have already seen. */
@@ -113,6 +127,8 @@ export type RollupState = {
   roots: Set<string>
   /** Requests asked and not yet answered, requestID → sessionID: the audience is being asked. */
   pending: Map<string, string>
+  /** Per-session tracking for silence: last frame's `at`/id and working flag. */
+  tracks: Map<string, SessionTrack>
 }
 
 /**

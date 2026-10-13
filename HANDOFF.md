@@ -154,7 +154,7 @@ needs a visible-window check; citations are present in the DOM.
 ## Next
 
 **The narrative layer's slice 1 is merged** (6 tasks, 220 tests). **Slice 2 is
-implemented** (5 tasks, 280 tests before final review fixes): beat end timestamps,
+implemented** (5 tasks, 280 tests; independent MiniMax review found no blockers): beat end timestamps,
 guarded absence slots, single-location scenes, chat-based episodes, the §5.2 checker,
 and episode/scene rendering beside the unchanged floor. Real quoted speech and explicit
 flashback markers are rendered distinctly. Everything is still template-only: no
@@ -164,6 +164,10 @@ The Director, model-call safeguards, scene replacement, series storage, recaps,
 character bibles/personas and plot labels remain slice 3. Before adding them, read the
 slice-2 execution notes appended to its plan; that plan's original episode timeout and
 some scene/test assertions contradicted the binding design and were not implemented.
+The same notes record final review rulings and deferred minors. In particular,
+`{never:}` requires episode-wide closure (not scene closure), full DOM rebuilds may
+need measured optimization for long sessions, and unseen-session cast learning is
+an existing edge case to fix with reconnect/seed handling.
 
 The `tool-fails` rule is settled by evidence, not intuition: a non-zero shell exit
 arrives as `tool.success` carrying `metadata.exit` (verified on the wire, with the

@@ -727,3 +727,52 @@ Screenshot capture was refused because the desktop window was hidden, even after
 tabs.focus. This is not a pixel-by-eye check, and hover/focus citation visibility
 remains unverified while that window is unfocused. No raw recording or credential was
 committed, printed or submitted to a model.
+
+### Final independent review — mark-minimax
+
+MiniMax reviewed source range `458577c..4225534` read-only and returned **ready to
+merge**, no Critical/Important findings. Sol checked its findings against source and
+ran a fresh 280-test suite, typecheck and build; the reviewer itself relied on logs
+for those commands and did not independently run the browser. No code fix pass was
+needed. Some review prose was inaccurate; the rulings below preserve the evidence.
+
+Final rulings on findings and subjects the reviewer set aside:
+
+- **Headings/time watermark:** reject this finding. `views.ts:57` passes `lines`, not
+  `heading`, into `checkScene`; headings cannot affect its watermark. Cost if wrong:
+  future refactoring must keep the two separate.
+- **Reviewer relying on replay logs:** not a code defect. Sol ran the real browser
+  replay and fresh verification commands; the review is independent source review,
+  not a second browser run. Cost if wrong: visible-window verification is still needed.
+- **Reconnect:** keep it deferred with the existing tombstone/reseed work; no new
+  reconnect behavior was promised here. Cost if wrong: a stale snapshot on reconnect.
+- **Screenshots:** remain blocked, not passed. Real DOM/layout/canvas evidence does
+  not replace eyes. Cost if wrong: an unnoticed visual/citation-display defect.
+- **Director/key/privacy and `closed`:** remain deferred. The page deliberately
+  does not assert a chat is closed on a scene boundary or stream flush; `{never:}`
+  must stay rejected until explicit episode-wide closure exists. A scene's closure
+  is not sufficient proof. Cost if wrong: future absence jokes are dropped safely.
+- **D2 plan contradictions:** settled owner decision still wins. Cost if wrong:
+  explicit episode-lifecycle redesign rather than an inferred Part Two.
+- **Lint-dirty plan examples:** actual tests use checked, lint-clean templates;
+  historical plan examples are not shipped output. Cost if wrong: future transcription
+  must use the execution notes and binding design.
+- **Vite native-loader warning:** pre-existing future compatibility warning, not a
+  runtime/build failure today. Cost if wrong: extension fixes at the next Vite upgrade.
+- **Authentication routes:** unchanged; existing credential handling was not audited
+  by this review, and no Director route was added. Cost if wrong: existing auth risk
+  remains outside this change's verification.
+- **Floor drawing:** unchanged; canvas drawing exists, but by-eye correctness remains
+  unchecked. Cost if wrong: an existing floor rendering defect survives.
+
+Deferred minors:
+
+- Full DOM rebuild is fine for the current 44-line golden replay, but may get expensive
+  for thousands of beats; it also replaces row nodes/focus. Add measured keyed updates
+  if long-session performance or keyboard focus suffers, not speculatively now.
+- Pre-existing `step.started` on a session absent from both snapshot and creation is
+  ignored by the rollup's cast learning. Such a session can remain `unidentified` until
+  a later creation/reseed; a later tool/run beat alone does not learn its agent.
+- A future Director must supply a genuinely closed episode context before `{never:}`
+  can render. No current template uses it; never mark an episode closed just because
+  one scene closes.

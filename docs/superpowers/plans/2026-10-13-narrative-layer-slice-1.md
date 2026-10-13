@@ -81,7 +81,7 @@ describe('dedupe — a reconnect replays frames we have already seen', () => {
     let s = createRollup()
     const emitted: string[] = []
     for (const fr of frames) { const r = rollup(s, fr); s = r.state; emitted.push(...r.beats.map(x => x.id)) }
-    expect(emitted).toEqual(['b:d'])
+    expect(emitted).toEqual(['b:b'])
     expect(flush(s)).toEqual([])
   })
 
@@ -212,7 +212,7 @@ Expected: FAIL — cannot resolve `../../src/narrative/rollup`
 
 `src/narrative/types.ts` holds `BeatKind` (the sixteen kinds in §4.1), `BeatDetail` (the union in §6), `Beat` (`{ id, at, eventIDs, kind, sessionID, detail }`), `SessionInfo`, `OpenRun`, and `RollupState` (`{ seenIDs, sessions, open, roots, pending }`).
 
-`rollup` returns `{ state, beats }`. Every beat's id is `` `b:${firstEventId}` ``; a frame with no `id` cannot start a beat and is only ever joined to one — note that in a comment, because it is the one rule that makes beats reproducible.
+`rollup` returns `{ state, beats }`. Every beat's id is `` `b:${eventIDs[0]}` `` — its **first** event, which is why a run is named where it *started* (§4.1) and why its `at` is that event's `created` (§6). A frame with no `id` cannot start a beat and can only ever be joined to one; when a beat's first event has no id at all, fall back to `` `b:${kind}:${sessionID}:${at}` `` rather than emitting a bare `b:` — an ugly stable id beats one that collides, and beats are never dropped for want of an id. Note that in a comment, because it is the rule the reproducibility depends on.
 
 Dedupe on `frame.id` **before** anything else and before recording it as seen. `memory-wipe` closes on `compaction.ended` **without emitting a beat** — it is one beat, not two. `execution.interrupted` with `reason === 'shutdown'` raises `cut` with that reason, matching `src/state/desk.ts`.
 
@@ -257,9 +257,15 @@ const drive = (st: any, frames: Frame[]) => {
 }
 
 describe('thinks and says are runs', () => {
-  it('raises on the first delta when we joined mid-run — no started frame', () => {
-    const { beats } = drive(seeded(), [f('reasoning.delta', { sessionID: 'x' }, { id: 'd1' })])
+  it('opens a run on the first delta when we joined mid-run — no started frame — and names it there', () => {
+    const { beats } = drive(seeded(), [
+      f('reasoning.delta', { sessionID: 'x' }, { id: 'd1' }),
+      f('reasoning.delta', { sessionID: 'x' }, { id: 'd2' }),
+      f('reasoning.ended', { sessionID: 'x' }, { id: 'd3' }),
+    ])
     expect(beats.map(b => b.kind)).toEqual(['thinks'])
+    expect(beats[0].id).toBe('b:d1')
+    expect(beats[0].detail).toEqual({ kind: 'thinks', deltas: 2, endedEventID: 'd3' })
   })
 
   it('carries the delta count on close, and zero when there were none', () => {
@@ -374,7 +380,7 @@ Expected: FAIL — no `thinks`/`says`/`uses-tool` beats are produced yet
 
 - [ ] **Step 3: Implement**
 
-A run opens on `X.started` **or** on the first `X.delta` when no run is open (`X` ∈ `reasoning`/`text`), and closes on `X.ended`; `flush` closes an open run with the events it has. Count only deltas.
+A run opens on `X.started` **or** on the first `X.delta` when no run is open (`X` ∈ `reasoning`/`text`), and closes on `X.ended`; `flush` closes an open run with the events it has. **The beat is emitted at the close, not the open** — §4.1 gives it a delta count, which cannot be known before then, and §4.2 has template lines appearing as each beat closes. Count only deltas.
 
 Calls: key by the call's `id`. `input.started` carries `name`; `called` and `progress` join an existing call and must **not** create one if the name was never seen (that is the "joined mid-call" case → `tool: 'unknown'`). A `shell.exited` joins via the `progress` metadata's `shellID`, so remember that mapping.
 
@@ -587,6 +593,7 @@ git add -A && git commit -m "test(narrative): a real recording as the golden fix
 - Consumes: `Beat` (Task 1)
 - Produces: `type Line = { id: string; speaker: 'narrator' | CastID; template: string; cites: string[]; flashback?: true }`; `type Rendered = { text: string; delivery: 'narration' | 'real-speech' | 'dramatised' }`; `renderLine(line, beats, ctx): Rendered | { rejected: string }`; `templateFor(beat, ctx): Line`; `castFor(sessions): (sessionID: string) => CastID`
 - Note: `ctx` supplies `cast` and the episode's beat order, and nothing else. **`delivery` is required, not decorative** — §5.1 says the viewer must always be able to tell the worker's real words from words written for the scene, and the Director must not be able to label a line real.
+- Note: cite beats **by id, never by parsing one**. `b:${eventIDs[0]}` holds for every kind except an id-less `episode-opens`, which falls back to `b:${kind}:${sessionID}:${at}`. An implementation that recovers an event id by splitting on `:` would work for ten beat kinds and quietly break on the eleventh.
 
 - [ ] **Step 1: Write the failing tests**
 

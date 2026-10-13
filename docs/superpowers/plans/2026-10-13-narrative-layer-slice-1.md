@@ -659,8 +659,8 @@ describe('slots render from their cites, and only from them', () => {
   it('fills tool, path, count and outcome', () => {
     expect(renderLine(line('{agent:b:1} runs {tool:b:1} on {path:b:1}.', ['b:1']), beats, ctx))
       .toEqual({ text: 'build runs read on src/a.ts.', delivery: 'narration' })
-    expect(renderLine(line('{count:uses-tool,b:1..b:2} reads.', ['b:1', 'b:2']), beats, ctx))
-      .toEqual({ text: '2 reads.', delivery: 'narration' })
+    expect(renderLine(line('{count:uses-tool,b:1..b:2} calls.', ['b:1', 'b:2']), beats, ctx))
+      .toEqual({ text: '2 calls.', delivery: 'narration' })
     expect(renderLine(line('that {outcome:b:4}.', ['b:4']), beats, ctx))
       .toEqual({ text: 'that exit 2.', delivery: 'narration' })
   })

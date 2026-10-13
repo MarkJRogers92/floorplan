@@ -10,15 +10,18 @@
  *
  *  - Every non-duplicate id is recorded as seen **before** any rule runs, so a frame a
  *    reconnect replays is dropped outright rather than opening a second run.
- *  - A frame with no `id` can never open a run: there is nothing to name it by, and an id we
- *    never recorded cannot be deduped, so a replay of it would raise the beat twice. Such a
- *    frame only ever joins a beat another frame started.
- *  - A beat whose first event has no id at all — an immediate beat raised by an id-less
- *    frame — falls back to `b:<kind>:<session>:<at>`: ugly, but stable and unique in every
- *    case we can reach, which a bare `b:` is not. Beats are never dropped for want of an id:
- *    losing real work because the platform omitted one is the worse failure.
- *  - `episode-opens` is raised by the first frame that shows a session we joined, id or no id,
- *    because §4.1 has the episode open — which is where that fallback earns its keep.
+ *  - A frame with no `id` can never open a run: a run is named by its first event's id, and
+ *    such a frame has none to give. It can still raise an immediate beat of its own —
+ *    `knocks`, `cut`, `episode-opens` — which takes the fallback name below rather than a
+ *    bare `b:`, because a stable unique id beats one that collides, and a beat is never
+ *    dropped for want of an id.
+ *  - A beat whose first event carries no id at all takes `b:<kind>:<session>:<at>`: ugly,
+ *    but stable and unique in every case we can reach.
+ *  - An episode opens on the root's `session.created`, its `execution.started` when we
+ *    joined after creation, or its first run or call beat — whichever comes first, and once
+ *    per root. Being merely the first frame we see opens nothing, so neither a bookkeeping
+ *    frame nor a stray `retry.scheduled` on a root we joined mid-turn can open one, while
+ *    that root's episode still opens the moment it does some work.
  */
 
 import type { Frame } from '../api/sse'
@@ -49,21 +52,6 @@ const beatID = (eventIDs: string[], kind: BeatKind, sessionID: string, at: numbe
  */
 const eventType = (type: string): string =>
   type.startsWith('session.') ? type.slice('session.'.length) : type
-
-/**
- * §4.1's "absorbed without a beat": they raise nothing of their own, and — the one
- * place this list is read — they cannot be the frame that announces a session we
- * joined, because bookkeeping is not an act. `compaction.ended` is here because it
- * *closes* the memory-wipe: that is one beat, raised by `compaction.started`, not two.
- */
-const ABSORBED = new Set([
-  'step.started', 'step.ended', 'step.streamed', 'usage.updated',
-  'inbox.delivered', 'instructions.updated', 'project.updated', 'provider.updated',
-  'model.updated', 'server.connected', 'deleted',
-  'tool.input.delta', 'tool.input.ended', 'tool.called', 'tool.progress',
-  'shell.created', 'shell.exited', 'shell.deleted',
-  'compaction.ended',
-])
 
 /** A `user` inbox item is the Human speaking; anything else is the platform talking. */
 const userItem = (data: Data): boolean => {
@@ -139,6 +127,21 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
     return { id: beatID(eventIDs, kind, subject, at), at, eventIDs, kind, sessionID: subject, detail }
   }
 
+  /**
+   * §4.1: an episode opens on the root's `session.created`, its `execution.started` when
+   * we joined after creation, or its first run or call beat — whichever comes first, and
+   * once per root. A frame that is merely the first we happen to see opens nothing: a stray
+   * `retry.scheduled` on a root we joined mid-turn is not an opening. Callers hold the
+   * trigger; this holds the once-per-root rule. Task 2's call beats open the episode from
+   * their own emission the same way.
+   */
+  const openEpisode = (subject: string): void => {
+    const info = sessions.get(subject)
+    if (info === undefined || info.arrived === true || !roots.has(subject)) return
+    sessions = setSession(sessions, { ...info, arrived: true })
+    beats.push(raise('episode-opens', subject, { kind: 'episode-opens' }))
+  }
+
   // --- the cast: who this session is, and who its parent is (§4.1 seeding) --------
 
   if (type === 'created' && sessionID !== '') {
@@ -167,28 +170,20 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
     }
   }
 
-  // --- an episode opens, a guest arrives (§4.1, §5.6) -----------------------------
-  // A root we were seeded with has no `session.created` here, so it opens the episode
-  // on the frame that shows it working. A guest we were seeded with has nothing to
-  // announce it at all, so it arrives on the first of its own frames we see — except
-  // its briefing, because on a child the user inbox item *is* the arrival, and two
-  // beats for one moment would narrate it twice.
-  const info = sessionID === '' ? undefined : sessions.get(sessionID)
-  if (info !== undefined && info.arrived !== true) {
-    const isRoot = roots.has(sessionID)
-    const briefing = type === 'inbox.enqueued' && userItem(data)
-    const opens = isRoot
-      ? type === 'created' || type === 'execution.started'
-      : !briefing && !ABSORBED.has(type)
-    if (opens || briefing) sessions = setSession(sessions, { ...info, arrived: true })
-    if (opens) {
-      beats.push(isRoot
-        ? raise('episode-opens', sessionID, { kind: 'episode-opens' })
-        : raise('guest-arrives', sessionID, { kind: 'guest-arrives', childSessionID: sessionID }))
-    }
-  }
+  // --- an episode opens (§4.1, §5.6) -----------------------------------------------
+  // Two of the three triggers live here: the root's own `session.created`, and its
+  // `execution.started` when we joined after creation. The third — its first run or call
+  // beat — is raised where that beat is emitted, further down.
+
+  if (type === 'created' || type === 'execution.started') openEpisode(sessionID)
 
   // --- the beats that need no history (§4.1) --------------------------------------
+  // §4.1's absorbed frames — `step.*`, `usage.updated`, `inbox.delivered`,
+  // `instructions`/`project`/`provider`/`model.updated`, `server.connected`,
+  // `tool.input.delta`/`.ended`, `tool.called`, `tool.progress`, `shell.*`,
+  // `compaction.ended`, session deletes, heartbeats — raise nothing and are simply not
+  // matched below. `compaction.ended` is absent because it *closes* the memory-wipe: that
+  // is one beat, raised by `compaction.started`, never two. Task 2 joins the call frames.
 
   if (type === 'inbox.enqueued' && userItem(data)) {
     // A user item on a root is the Human asking; on a child it is the briefing that
@@ -249,7 +244,8 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
   // A run opens on `X.started`, or on the first `X.delta` when we joined mid-run, and
   // closes on `X.ended`. Its beat is emitted at the close, because only then is the delta
   // count known, but it is named where it started — the frame that opened it, which is
-  // the first event of its range: nothing outside the run joins `eventIDs`.
+  // the first event of its range: nothing outside the run joins `eventIDs`. A run beat is
+  // also a root's third way to open its episode, so it is raised just before the beat.
 
   const part = type.endsWith('.started') ? 'started'
     : type.endsWith('.delta') ? 'delta'
@@ -268,6 +264,7 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
         next.delete(key)
         open = next
         const eventIDs = id === undefined ? current.eventIDs : [...current.eventIDs, id]
+        openEpisode(current.sessionID) // §4.1: this may be the root's first beat
         beats.push({
           id: beatID(eventIDs, current.kind, current.sessionID, current.at),
           at: current.at,
@@ -304,10 +301,27 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
  * §4.1's flush, at stream end: open runs close with the events they have. A call with
  * no success produces no beat, and neither does a session that never wrapped — the
  * footage simply stops, which is the next slice's business to narrate, not this one's.
+ *
+ * A root whose first beat is one of these was opened by nothing else, so its opener is
+ * raised here too — once per root, just before the beat that earned it. It has no frame
+ * of its own to be named by, so it takes the fallback name.
  */
 export function flush(state: RollupState): Beat[] {
   const beats: Beat[] = []
+  const opened = new Set<string>()
   for (const run of state.open.values()) {
+    const info = state.sessions.get(run.sessionID)
+    if (info !== undefined && info.arrived !== true && state.roots.has(run.sessionID) && !opened.has(run.sessionID)) {
+      opened.add(run.sessionID)
+      beats.push({
+        id: beatID([], 'episode-opens', run.sessionID, run.at),
+        at: run.at,
+        eventIDs: [],
+        kind: 'episode-opens',
+        sessionID: run.sessionID,
+        detail: { kind: 'episode-opens' },
+      })
+    }
     beats.push({
       id: beatID(run.eventIDs, run.kind, run.sessionID, run.at),
       at: run.at,

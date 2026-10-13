@@ -58,13 +58,18 @@ describe('dedupe — a reconnect replays frames we have already seen', () => {
 })
 
 describe('seeding — joining a session mid-stream still gives it a root, a parent and a cast', () => {
-  it('knows a session that was created before we connected', () => {
+  it('knows a session that was created before we connected, and narrates no arrival for it', () => {
     const s = seedRollup(createRollup(), {
       sessions: [{ id: 'root', agent: 'plan' }, { id: 'child', parentID: 'root', agent: 'build' }],
       permissions: [],
     })
-    const r = rollup(s, f('text.started', { sessionID: 'child' }))
-    expect(r.beats[0].sessionID).toBe('child')
+    // An arrival is an *event*. A guest that already existed when we connected never
+    // emitted one to us, so it is in the cast but never arrives on screen (§4.1).
+    const opened = rollup(s, f('text.started', { sessionID: 'child' }, { id: 'e1' }))
+    const closed = rollup(opened.state, f('text.ended', { sessionID: 'child' }, { id: 'e2' }))
+    expect(closed.beats.map(b => b.kind)).toEqual(['says'])
+    expect(closed.beats[0].sessionID).toBe('child')
+    expect(closed.beats.map(b => b.kind)).not.toContain('guest-arrives')
   })
 
   it('raises episode-opens for a root session we joined, not one per frame', () => {
@@ -156,7 +161,7 @@ describe('no clock', () => {
 
 describe('the rules the tests above leave implicit', () => {
   it('counts an id-less delta into an open run but cannot cite it', () => {
-    let s = seedRollup(createRollup(), { sessions: [{ id: 'x' }], permissions: [] })
+    let s = createRollup()
     s = rollup(s, f('reasoning.started', { sessionID: 'x' }, { id: 'a' })).state
     const r = rollup(s, f('reasoning.delta', { sessionID: 'x' }))
     expect(r.beats).toEqual([])
@@ -177,15 +182,6 @@ describe('the rules the tests above leave implicit', () => {
     const s = seedRollup(createRollup(), { sessions: [{ id: 'x' }], permissions: [] })
     const r = rollup(s, f('compaction.ended', { sessionID: 'x' }, { id: 'evt1' }))
     expect(r.beats).toEqual([])
-  })
-
-  it('arrives a guest we joined on the first frame of its own we see', () => {
-    const s = seedRollup(createRollup(), {
-      sessions: [{ id: 'root' }, { id: 'child', parentID: 'root' }], permissions: [],
-    })
-    const r = rollup(s, f('inbox.enqueued', { sessionID: 'child', item: { type: 'synthetic' } }, { id: 'evt1' }))
-    expect(r.beats.map(b => b.kind)).toEqual(['guest-arrives'])
-    expect(r.beats[0].detail).toEqual({ kind: 'guest-arrives', childSessionID: 'child' })
   })
 
   // Finding 1: a beat is named by its FIRST event, and for a run that is the frame that
@@ -212,8 +208,12 @@ describe('the rules the tests above leave implicit', () => {
       f('reasoning.started', { sessionID: 'x' }, { id: 'a', created: 100 }),
       f('reasoning.ended', { sessionID: 'x' }, { id: 'd', created: 400 }),
     ]) { const r = rollup(s, fr); s = r.state; out.push(...r.beats) }
-    expect(out[0].id).toBe('b:a')
-    expect(out[0].eventIDs).toEqual(['a', 'd'])
+    // 'x' is a seeded root we joined mid-turn, so the run's beat is also what opens the
+    // episode: two beats, and they do not share an id — the opener is named by the frame
+    // that produced the beat, the beat by where its run started.
+    expect(out.map(b => b.kind)).toEqual(['episode-opens', 'thinks'])
+    expect(out.map(b => b.id)).toEqual(['b:d', 'b:a'])
+    expect(out[1].eventIDs).toEqual(['a', 'd'])
   })
 
   // Finding 2: no bare 'b:' — a stable fallback, and the beat is never dropped.
@@ -229,6 +229,46 @@ describe('the rules the tests above leave implicit', () => {
     const r = rollup(s, f('execution.started', { sessionID: 'root' }))
     expect(r.beats.map(b => b.kind)).toEqual(['episode-opens'])
     expect(r.beats[0].id).toBe('b:episode-opens:root:0')
+  })
+})
+
+describe('an episode opens on the root, once, and only on real work', () => {
+  it('opens on the root\'s first run beat when we joined mid-turn', () => {
+    let s = seedRollup(createRollup(), { sessions: [{ id: 'x' }], permissions: [] })
+    const out: Beat[] = []
+    for (const fr of [
+      f('retry.scheduled', { sessionID: 'x', attempt: 2 }, { id: 'r' }),
+      f('reasoning.started', { sessionID: 'x' }, { id: 'a' }),
+      f('reasoning.ended', { sessionID: 'x' }, { id: 'd' }),
+    ]) { const r = rollup(s, fr); s = r.state; out.push(...r.beats) }
+    // The stray retry before any work opens nothing; the root's first run beat opens it.
+    expect(out.map(b => b.kind)).toEqual(['retry', 'episode-opens', 'thinks'])
+    expect(out.filter(b => b.kind === 'episode-opens')).toHaveLength(1)
+  })
+
+  it('opens at flush for a root whose only run never closed', () => {
+    let s = seedRollup(createRollup(), { sessions: [{ id: 'x' }], permissions: [] })
+    for (const fr of [
+      f('reasoning.started', { sessionID: 'x' }, { id: 'a', created: 500 }),
+      f('reasoning.delta', { sessionID: 'x' }, { id: 'b', created: 600 }),
+    ]) s = rollup(s, fr).state
+    const closed = flush(s)
+    expect(closed.map(b => b.kind)).toEqual(['episode-opens', 'thinks'])
+    expect(closed[0].id).toBe('b:episode-opens:x:500')
+    expect(closed[1].detail).toEqual({ kind: 'thinks', deltas: 1 })
+  })
+
+  it('never opens an episode for a child, whatever it gets up to', () => {
+    let s = seedRollup(createRollup(), {
+      sessions: [{ id: 'root' }, { id: 'child', parentID: 'root' }], permissions: [],
+    })
+    const out: Beat[] = []
+    for (const fr of [
+      f('execution.started', { sessionID: 'child' }, { id: 'a' }),
+      f('reasoning.started', { sessionID: 'child' }, { id: 'b' }),
+      f('reasoning.ended', { sessionID: 'child' }, { id: 'c' }),
+    ]) { const r = rollup(s, fr); s = r.state; out.push(...r.beats) }
+    expect(out.map(b => b.kind)).toEqual(['thinks'])
   })
 })
 

@@ -7,6 +7,7 @@ import type { Scene } from './scene'
 import type { Beat, SessionInfo } from './types'
 
 export type DirectorResult = { lines: ScriptLine[]; mode: 'director' | 'templates' }
+export type DirectorRequest = { sceneID: string; beats: Beat[]; sessions: SessionInfo[] }
 const object = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const unsupported = /\{(?:ordinal|first|last|never|cost):/
 const outcomeWords = /\b(?:succeeded|success|successfully|failed|failure|interrupted|approved|denied|rejected|cancelled|exit)\b/i

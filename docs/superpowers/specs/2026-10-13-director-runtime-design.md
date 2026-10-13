@@ -62,6 +62,14 @@ Missing beat coverage is filled by independent templates; invalid ordering/cast/
 composition falls back wholesale. Completed narration is rechecked against current
 footage/cast before display, never trusted simply because the server returned it.
 
+Builder check (DeepSeek): shared wire types live in narrative/director.ts, not dev.
+Server returns `{mode,lines,reason}` after the same pure validator; client validates again.
+Client sends the COMPLETE chat's session snapshot (no truncation) to preserve suffixes;
+over 128 sessions, corrupt/non-finite evidence or 32,768 bytes means templates/no request.
+The provider targets 1–6 short lines; 24 is a defensive output-array ceiling, not a
+generation target. The 1,024 token cap remains authoritative; truncation falls back.
+Vite's default CORS would precede plugin middleware, so config explicitly disables it.
+
 ## Verification
 
 TDD for the real validator, service budget/dedupe/cancellation and HTTP trust boundary,

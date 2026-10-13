@@ -1,3 +1,5 @@
 node_modules/
 dist/
 fixtures/raw/
+.env*
+!.env.example

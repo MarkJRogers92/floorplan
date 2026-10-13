@@ -294,15 +294,17 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
         open = next
         const eventIDs = id === undefined ? current.eventIDs : [...current.eventIDs, id]
         openEpisode(current.sessionID) // §4.1: this may be the root's first beat
+        const runText = str(data.text)
+        const detail: BeatDetail = { kind: current.kind, deltas: current.deltas }
+        if (runText !== undefined) (detail as { text?: string }).text = runText
+        if (id !== undefined) (detail as { endedEventID?: string }).endedEventID = id
         beats.push({
           id: beatID(eventIDs, current.kind, current.sessionID, current.at),
           at: current.at,
           eventIDs,
           kind: current.kind,
           sessionID: current.sessionID,
-          detail: id === undefined
-            ? { kind: current.kind, deltas: current.deltas }
-            : { kind: current.kind, deltas: current.deltas, endedEventID: id },
+          detail,
         })
       }
     } else if (current !== undefined) {

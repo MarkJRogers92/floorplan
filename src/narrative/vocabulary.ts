@@ -44,6 +44,22 @@ export const KNOWN_NAMES = new Set([
 const digitRe = /\d/
 const pathRe = /[a-zA-Z0-9_\-.]+\/[a-zA-Z0-9_\-./]+|[a-zA-Z]:\\[^\s]+|~\/[^\s]+|\/[^\s]+/
 
+const ones = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']
+const teens = ['ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen']
+const tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety']
+
+export const numberToWords = (n: number): string => {
+  if (n === 0) return 'none'
+  if (n < 10) return ones[n]!
+  if (n < 20) return teens[n - 10]!
+  if (n < 100) {
+    const t = Math.floor(n / 10)
+    const o = n % 10
+    return o === 0 ? tens[t]! : `${tens[t]!}-${ones[o]!}`
+  }
+  return String(n)
+}
+
 export const lintFreeText = (text: string): string | undefined => {
   if (digitRe.test(text)) return 'template contains a digit'
   const words = text.toLowerCase().match(/[a-z]+/g) ?? []

@@ -51,6 +51,17 @@ describe('thinks and says are runs', () => {
     expect(beats[0].detail).toEqual({ kind: 'says', deltas: 1, endedEventID: 'c' })
   })
 
+  it('captures the verbatim text from a text.ended or reasoning.ended frame', () => {
+    const { beats } = drive(seeded(), [
+      f('text.started', { sessionID: 'x' }, { id: 'a' }),
+      f('text.ended', { sessionID: 'x', text: 'We are finished.' }, { id: 'b' }),
+      f('reasoning.started', { sessionID: 'x' }, { id: 'c' }),
+      f('reasoning.ended', { sessionID: 'x', text: 123 }, { id: 'd' }),
+    ])
+    expect(beats[0].detail).toEqual({ kind: 'says', deltas: 0, text: 'We are finished.', endedEventID: 'b' })
+    expect(beats[1].detail).toEqual({ kind: 'thinks', deltas: 0, endedEventID: 'd' })
+  })
+
   it('closes an open run at stream end rather than losing it', () => {
     const { state, beats } = drive(seeded(), [
       f('text.started', { sessionID: 'x' }, { id: 'a' }),

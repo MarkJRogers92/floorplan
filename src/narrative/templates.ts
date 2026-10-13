@@ -43,8 +43,13 @@ export function templateFor(beat: Beat, ctx: Ctx): Line {
     case 'thinks':
       return narrator('{agent:' + id(beat) + '} sat with {deltas:' + id(beat) + '} thoughts.', [id(beat)])
 
-    case 'says':
-      return character(agentOf(beat, ctx), '{quote:' + id(beat) + '}', [id(beat)])
+    case 'says': {
+      const runDetail = beat.detail as { deltas: number; text?: string }
+      if (runDetail.text !== undefined && runDetail.text !== '') {
+        return character(agentOf(beat, ctx), '{quote:' + id(beat) + '}', [id(beat)])
+      }
+      return narrator('{agent:' + id(beat) + '} spoke {deltas:' + id(beat) + '} times.', [id(beat)])
+    }
 
     case 'uses-tool': {
       const toolDetail = beat.detail as { tool: string | 'unknown'; callID?: string; path?: string; exit?: number }
@@ -80,6 +85,6 @@ export function templateFor(beat: Beat, ctx: Ctx): Line {
       return narrator('{outcome:' + id(beat) + '}.', [id(beat)])
 
     case 'silence':
-      return narrator('Nothing happened for {dur:' + id(beat) + '..' + id(beat) + '}.', [id(beat)])
+      return narrator('Nothing happened for {gap:' + id(beat) + '}.', [id(beat)])
   }
 }

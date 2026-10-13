@@ -25,14 +25,14 @@ export type BeatKind =
 
 /** §6's `BeatDetail`, verbatim. */
 export type BeatDetail =
-  | { kind: 'thinks' | 'says'; deltas: number; endedEventID?: string }
+  | { kind: 'thinks' | 'says'; deltas: number; text?: string; endedEventID?: string }
   | { kind: 'uses-tool' | 'tool-fails'; tool: string | 'unknown'; callID?: string; path?: string; exit?: number }
   | { kind: 'guest-arrives' | 'guest-leaves' | 'briefing'; childSessionID: string; callID?: string }
   | { kind: 'knocks'; requestID: string }
   | { kind: 'answered'; reply: string }
   | { kind: 'retry'; attempt: number }
   | { kind: 'cut'; reason: string }
-  | { kind: 'silence'; fromEventID: string; toEventID: string }
+  | { kind: 'silence'; fromEventID: string; toEventID: string; ms: number }
   | { kind: 'episode-opens' | 'human-asks' | 'memory-wipe' | 'wrap' }
 
 export type Beat = {

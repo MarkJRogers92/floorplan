@@ -8,7 +8,7 @@
 
 import type { CastID } from './cast'
 import type { Beat } from './types'
-import { lintFreeText } from './vocabulary'
+import { lintFreeText, numberToWords } from './vocabulary'
 
 export type Line = {
   id: string
@@ -43,6 +43,7 @@ type Slot =
   | { name: 'dur'; range: Range }
   | { name: 'cost'; range: Range }
   | { name: 'quote'; beat: string }
+  | { name: 'gap'; beat: string }
   | { name: 'never'; key: string }
   | { name: 'hedge' }
 
@@ -100,7 +101,8 @@ const parseSlot = (inner: string): Slot | undefined => {
     case 'agent':
     case 'path':
     case 'outcome':
-    case 'quote': {
+    case 'quote':
+    case 'gap': {
       if (args.length !== 1) return undefined
       return { name, beat: args[0]! }
     }
@@ -138,6 +140,17 @@ const ordinalWord = (n: number): string => {
   return `${s}${suffix}`
 }
 
+const formatDuration = (ms: number): string | undefined => {
+  if (ms < 0) return undefined
+  const sec = Math.floor(ms / 1000)
+  if (sec < 60) {
+    const rounded = Math.floor(sec / 5) * 5
+    return rounded === 0 ? 'a moment' : `${numberToWords(rounded)} seconds`
+  }
+  const min = Math.floor(sec / 60)
+  return `${numberToWords(min)} minute${min === 1 ? '' : 's'}`
+}
+
 const isToolBeat = (beat: Beat): boolean =>
   beat.kind === 'uses-tool' || beat.kind === 'tool-fails'
 
@@ -162,7 +175,7 @@ const beatsInRange = (beats: Map<string, Beat>, order: string[], range: Range): 
 }
 
 type ToolDetail = { tool: string | 'unknown'; callID?: string; path?: string; exit?: number }
-type RunDetail = { kind: 'thinks' | 'says'; deltas: number; endedEventID?: string }
+type RunDetail = { kind: 'thinks' | 'says'; deltas: number; text?: string; endedEventID?: string }
 
 const toolDetail = (beat: Beat): ToolDetail | undefined =>
   isToolBeat(beat) ? (beat.detail as ToolDetail) : undefined
@@ -263,15 +276,7 @@ const renderSlot = (
       if (list.length === 0) return undefined
       const first = list[0]!.at
       const last = list[list.length - 1]!.at
-      const ms = last - first
-      if (ms < 0) return undefined
-      const sec = Math.floor(ms / 1000)
-      if (sec < 60) {
-        const rounded = Math.floor(sec / 5) * 5
-        return rounded === 0 ? 'a moment' : `${rounded} seconds`
-      }
-      const min = Math.floor(sec / 60)
-      return `${min} minute${min === 1 ? '' : 's'}`
+      return formatDuration(last - first)
     }
     case 'cost': {
       // Beats do not yet carry cost; the slot exists for the full vocabulary.
@@ -279,9 +284,14 @@ const renderSlot = (
     }
     case 'quote': {
       const beat = getBeat(beats, slot.beat)
-      if (beat === undefined || (beat.kind !== 'thinks' && beat.kind !== 'says')) return undefined
-      // The beat stores the ended event id but not the verbatim text in this slice.
-      return ''
+      const d = beat && runDetail(beat)
+      if (d?.text === undefined || d.text === '') return undefined
+      return d.text
+    }
+    case 'gap': {
+      const beat = getBeat(beats, slot.beat)
+      if (beat === undefined || beat.kind !== 'silence') return undefined
+      return formatDuration((beat.detail as { ms: number }).ms)
     }
     case 'never': {
       const count = order.filter(id => matchesKey(beats.get(id)!, slot.key)).length
@@ -334,6 +344,7 @@ export function renderLine(line: Line, beats: Map<string, Beat>, ctx: Ctx): Rend
       case 'path':
       case 'outcome':
       case 'quote':
+      case 'gap':
         return [slot.beat]
       case 'again':
       case 'before':

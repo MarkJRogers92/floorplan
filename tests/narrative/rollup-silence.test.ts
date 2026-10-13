@@ -21,7 +21,7 @@ describe('silence', () => {
     ])
     const silence = beats.find(b => b.kind === 'silence')
     expect(silence).toBeDefined()
-    expect(silence!.detail).toEqual({ kind: 'silence', fromEventID: 'd', toEventID: 'e' })
+    expect(silence!.detail).toEqual({ kind: 'silence', fromEventID: 'd', toEventID: 'e', ms: 37000 })
   })
 
   it('does not raise for a gap under 30s', () => {
@@ -60,7 +60,7 @@ describe('silence', () => {
       f('text.started', { sessionID: 'x' }, { id: 'd', created: 60000 }),
     ])
     const silence = beats.find(b => b.kind === 'silence')
-    expect(silence!.detail).toEqual({ kind: 'silence', fromEventID: 'c', toEventID: 'd' })
+    expect(silence!.detail).toEqual({ kind: 'silence', fromEventID: 'c', toEventID: 'd', ms: 58000 })
   })
 
   it('does not share its id with the beat the ending frame itself raises', () => {

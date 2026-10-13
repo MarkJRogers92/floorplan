@@ -99,7 +99,7 @@ export function checkSilence(params: {
   // string there. The silence's own id (kind fallback) is independent of either.
   const eventIDs = [prior.lastEventID, ...(id === undefined ? [] : [id])]
   const toEventID = id ?? ''
-  const detail: BeatDetail = { kind: 'silence', fromEventID: prior.lastEventID, toEventID }
+  const detail: BeatDetail = { kind: 'silence', fromEventID: prior.lastEventID, toEventID, ms: at - prior.lastAt }
   return {
     id: beatID(eventIDs, 'silence', sessionID, at),
     at, eventIDs, kind: 'silence', sessionID, detail,

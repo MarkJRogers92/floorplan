@@ -71,8 +71,10 @@ inverted or non-earlier timestamps are omitted rather than guessed. Each line is
 recomputed in the browser from its paired episode/beat reference; no historical footage
 enters current scene evidence, stage reactions or Director requests. Unknown scope,
 metadata-only chats and replays do not read recaps. A failed read shows a small notice
-without stopping the script; unchanged failed reads wait for a scope/cutoff change or
-reload, not an automatic retry loop.
+without stopping the script. Transient network/storage/server failures retry at most
+three times,30s apart; reset/replay/scope/cutoff changes cancel them. Corrupt/unsafe
+archives, missing routes and invalid proof never retry. After exhaustion, reload or a
+scope/cutoff change is needed; there is no unlimited history-read loop.
 
 The floor now shows a shared, hand-authored monitor-clerk with five static poses.
 Current live/replay beats cue short, explicitly dramatised reactions; colours still

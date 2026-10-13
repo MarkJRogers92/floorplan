@@ -61,7 +61,7 @@ function offsetOf(seed: string): number {
 
 /**
  * Pure stage cue runtime: real beats in, per-actor pose frames out. No DOM, no canvas,
- * no timers, no clock of its own — `now` is the caller's reception clock, so a replay or
+ * no timers, no clock of its own — `now` is the caller's reception clock, so
  * replay follows reception time; callers keep archived recap beats out of update. Actor ids are handed back
  * untouched; the room decides which of them still have a desk.
  */

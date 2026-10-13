@@ -148,6 +148,7 @@ const parseMoment = (value: unknown, root: string, before: number): RecapMoment 
   const text = (beat.detail as { text?: string }).text
   if (text !== undefined && text.length > MAX_RECAP_TEXT) return undefined
   if (bytes(value) > MAX_MOMENT_BYTES) return undefined
+  if (lineFor(value as RecapMoment) === undefined) return undefined
   return value as RecapMoment
 }
 

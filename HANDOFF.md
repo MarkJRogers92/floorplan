@@ -239,7 +239,33 @@ one another; last-agent status updates are cosmetic; original browser assertions
 recorded as structural checks rather than a shipped browser runner (the new guest
 refresh assertion is retained in the scratch harness).
 
-Recaps, plot labels and staged visuals remain next. Before extending episode lifecycle, read the slice-2 execution notes;
+**Recap/stage follow-up:** live episodes now have local, read-only “Previously on…”
+montages: three proved moments/two earlier archived roots, matching observed project,
+strict earlier positive clocks, paired episode/beat refs and an always-partial label.
+Browser recomputes templates; reset/replay/scope/cutoff races discard late replies.
+Transient reads get at most three30s retries; permanent/proof failures never retry.
+Recaps never enter Director/current-stage evidence. Pure stage cues consume newly
+arrived live/replay beats with a reception clock, two-second expiry and reduced-motion
+offsets; guest cues target children, rendering never resurrects deleted desks.
+Desk status colours remain factual. The shared monitor-clerk is hand-authored in live
+Aseprite: five static16x20 poses in a layered80x20 named-slice sheet, initialized with
+owner-approved PICO-8 only on the new document. No art generation/dependencies/provider
+app calls. Luna/OpenAI final visual critique7/10/no blockers, first-pass art; retained
+selective-outline warnings are documented in `assets/worker-design.md`.
+
+Verified493 tests/50 files, typecheck/build and browser-bundle privacy sentinels.
+Actual synthetic-page assertions cover safe proved partial recap, crop/drawImage,
+live-failure recoil, changing/reduced offsets, expiry, guest/child deletion, history
+not moving actors and replay with zero additional archive GET/POST. Aseprite validate
+and Pixel Forge lint pass; full-page screenshot was blocked by desktop-window visibility.
+Independent DeepSeek API whole-feature review found no Criticals; three Importants
+were addressed: bounded transient-read recovery, parser/rendered-cap agreement and
+tracked dependency-free DOM/canvas regressions. Fresh follow-up review verified the
+fixes and all493 tests, with no remaining Critical/Important findings. Integration is tracked in the ignored
+`.superpowers/sdd/2026-10-13-recaps-and-stage/progress.md` ledger.
+
+Plot labels, individual character designs and full office animation remain next.
+Before extending episode lifecycle, read the slice-2 execution notes;
 that plan's original timeout contradicted D2 and was not implemented.
 The same notes record final review rulings and deferred minors. In particular,
 `{never:}` requires episode-wide closure (not scene closure), full DOM rebuilds may

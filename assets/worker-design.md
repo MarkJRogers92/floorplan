@@ -41,6 +41,8 @@ The app uses nearest-neighbour2x rendering; stage offsets stay in the actor's ow
 Independent Luna/OpenAI visual critique scored the first draft6/10, usable as first-pass
 poses without blockers, and requested clearer hand-to-chin contact. Sol made that
 focused thinking-arm fix, inspected it at2x/8x, then saved/exported through live tools.
+Luna's follow-up read of the final PNG scored7/10, with clearer chin contact and no
+concrete blockers; contact remains subtle at1x. Still first-pass poses, not full office art.
 Aseprite validate passed80/100 with four selective/per-layer-outline warnings;
 Pixel Forge lint passed95/100 with one flattened-outline warning. Retained deliberately:
 upper-left highlights and limb attachment edges are not uniformly outlined. No palette,

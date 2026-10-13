@@ -47,7 +47,12 @@ no-store/nosniff JSON, bounded output and private validated store.load; never cr
 Validate before as finite positive <=Number.MAX_SAFE_INTEGER. No caller disk paths.
 Standalone nonblocking recap client caches per root+key+cutoff, dedupes unchanged inputs,
 aborts superseded/reset/replay reads and rejects late replies even when fetch ignores abort.
-Only roots with observed footage read, not every REST chat. No read-triggered POST/retry loops.
+Only roots with observed footage read, not every REST chat. No read-triggered POSTs or
+unbounded retry loops. Review refinement: network/423/429/5xx/409-unavailable failures
+may retry at most three times,30s apart, without needing new footage. Corrupt/unsafe,
+absent-route or invalid-proof failures never retry. Reset/replay/scope/cutoff changes
+cancel pending retries and reject late in-flight replies. Exhaustion keeps the notice;
+reload or new scope/cutoff is required to attempt again.
 Never pass recap content to Director, stage.update or current scene evidence.
 Render safe textContent with real-speech styling, visible/focusable episode+beat citations.
 No timestamp guessing or fake “no history” claim; empty recaps are hidden.

@@ -32,7 +32,7 @@
 **Files:** series-route/store-hook tests; new `src/app/recap-client.ts` and tests; `src/app/script-view.ts`; main/index/docs.
 - [ ] Real temporary-store HTTP RED tests for earlier-scope proof, no writes, guards, invalid clock, corruption.
 - [ ] Add /recap to existing handler using store.load + buildRecap; no store API/schema change.
-- [ ] Client RED tests: observed timestamped roots, cutoff/key signatures, no repeat/POST, unknown/replay/reset/superseded/failure.
+- [ ] Client RED tests: observed timestamped roots, cutoff/key signatures, no repeat/POST, unknown/replay/reset/superseded/failure; review refinement adds at most three30s transient retries, permanent-proof/archive refusal and timer/in-flight cancellation.
 - [ ] Implement client independent of save/Director; extract existing DOM render helpers preserving memory disclosure/opt-out/citations; add safe proved recap section.
 - [ ] Full tests/typecheck/build/privacy scan and actual synthetic page evidence; commit.
 
@@ -47,4 +47,5 @@
 - [ ] Read artist resources, fresh ready preflight, new document/info, existing palette, batched5pose drawing.
 - [ ] Look at1x/2x, fix only observed issues, validate, live save/export (no file fallback). Integrate atlas nearest-neighbour with rectangle fallback.
 - [ ] Full suite/typecheck/build/key-sentinel/private-data scan; final independent read-only review across whole branch, one TDD blocker-fix pass, ledger remaining minors.
+- [ ] Keep dependency-free DOM/canvas regression tests in tracked tests/, alongside the actual synthetic-page checks.
 - [ ] Owner-authorized integration/push after fresh merged verification; report actual art/model/tests/limits.

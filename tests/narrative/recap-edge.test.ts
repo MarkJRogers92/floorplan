@@ -16,3 +16,9 @@ it('opaque paired refs cannot collide through a separator inside an ID', () => {
   const parsed = parseRecap({ ...base, moments: [moment('old', 'x\u0000y'), moment('old\u0000x', 'y')] }, key, 'current', 1000)
   expect(parsed?.moments).toHaveLength(2)
 })
+it('requires the same rendered-line cap as the builder, not only the raw quote cap', () => {
+  const moment = { episodeID: 'ep:old', session: { id: 'old', agent: 'build' },
+    beat: { id: 'long-path', sessionID: 'old', at: 100, endAt: 100, eventIDs: ['proof'], kind: 'uses-tool',
+      detail: { kind: 'uses-tool', tool: 'read', path: 'a/'.repeat(160) } } }
+  expect(parseRecap({ ...base, moments: [moment] }, key, 'current', 1000)).toBeUndefined()
+})

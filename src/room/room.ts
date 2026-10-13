@@ -13,8 +13,6 @@ const COLOURS: Record<DeskStatus, string> = {
 }
 
 const RADIUS = 6
-const DOT = 6
-const DOT_FILL = '#2b2d3a'
 
 export function statusColour(status: DeskStatus): string {
   return COLOURS[status]
@@ -37,10 +35,6 @@ export function createRoom(canvas: HTMLCanvasElement): { draw(desks: Desk[]): vo
         ctx.fillStyle = statusColour(desk.status)
         ctx.beginPath()
         ctx.roundRect(r.x, r.y, r.w, r.h, RADIUS)
-        ctx.fill()
-        ctx.fillStyle = DOT_FILL
-        ctx.beginPath()
-        ctx.arc(r.x + r.w - DOT, r.y + DOT, DOT / 2, 0, Math.PI * 2)
         ctx.fill()
       })
     },

@@ -30,6 +30,7 @@ import type {
 } from './types'
 import { findGuestCall, foldCall } from './calls'
 import { beatID, checkSilence, nextWorking, updateTrack } from './silence'
+import { learnSeriesScope, preferSeriesKey } from './scope'
 
 type Data = Record<string, unknown>
 
@@ -81,6 +82,8 @@ export function seedRollup(state: RollupState, snapshot: NarrativeSnapshot): Rol
     if (typeof session?.id !== 'string' || session.id === '') continue
     const known = sessions.get(session.id)
     const merged = { ...known, ...Object.fromEntries(Object.entries(session).filter(([, value]) => value !== undefined)) } as SessionInfo
+    const seriesKey = preferSeriesKey(known?.seriesKey, session.seriesKey)
+    if (seriesKey !== undefined) merged.seriesKey = seriesKey
     sessions.set(session.id, merged)
     if (merged.parentID === undefined) roots.add(session.id)
     else roots.delete(session.id)
@@ -193,6 +196,7 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
   }
 
   // --- an episode opens (§4.1, §5.6) -----------------------------------------------
+  sessions = learnSeriesScope(sessions, frame)
   // Two of the three triggers live here: the root's own `session.created`, and its
   // `execution.started` when we joined after creation. The third — its first run or call
   // beat — is raised where that beat is emitted, further down.

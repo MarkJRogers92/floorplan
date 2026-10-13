@@ -62,6 +62,8 @@ export type SessionInfo = {
   parentID?: string
   agent?: string
   model?: string
+  /** Project identity learned from footage/snapshot, never the client cwd. */
+  seriesKey?: string
   /**
    * True once this session has made its narrative debut: a root's episode has opened,
    * or a child's `guest-arrives` has been raised. Prevents duplicate arrivals/openers.

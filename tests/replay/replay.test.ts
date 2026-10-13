@@ -75,3 +75,10 @@ describe('replay — abort during the step delay (review fix 2)', () => {
     expect(seen).toEqual(['a'])
   })
 })
+
+describe('readFrames — created and location survive a round trip', () => {
+  it('keeps them from a recording line', () => {
+    const f = write('{"id":"e1","created":5,"type":"a","location":{"directory":"/x"},"data":{}}\n')
+    expect(readFrames(f)[0]).toEqual({ id: 'e1', created: 5, type: 'a', location: { directory: '/x' }, data: {} })
+  })
+})

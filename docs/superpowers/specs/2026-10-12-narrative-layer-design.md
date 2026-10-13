@@ -350,11 +350,12 @@ type CastID  = string   // agent name, e.g. "plan"; with a session suffix ("plan
 type Series  = { id: string; key: string; episodes: string[] }   // key: §10.1
 type Episode = { id: string; seriesID: string; rootSessionID: string;
                  title?: Line; scenes: Scene[]; cast: CastID[] }
-type Scene   = { id: string; location: Location; cast: CastID[]; beats: string[]; lines: Line[];
+type Scene   = { id: string; location: Location; rootSessionID: string; cast: CastID[]; beats: string[]; lines: Line[];
                  heading: Line }
 type Location = { kind: 'desk'; sessionID: string } | { kind: 'to-camera' }   // a session's desk; addressing the audience
 type Beat    = { id: string;        // `b:<first event id>`; BeatKind = the kinds in §4.1
-                 at: number;        // `created` of the beat's first event (run start)
+                  at: number;        // `created` of the beat's first event (run start)
+                  endAt: number;     // `created` of the beat's last contributing event
                  eventIDs: string[]; kind: BeatKind; sessionID: string; detail: BeatDetail }
 type BeatDetail =
   | { kind: 'thinks' | 'says'; deltas: number; endedEventID?: string; text?: string }
@@ -515,4 +516,3 @@ are a presentation feature to add if episode cards are ever wanted, and inventin
 boundaries now would be guesswork. **The script takes the primary column with the floor a
 panel beside it** — the owner's direction is that the script is the main surface now and
 the visuals become the stage later, which is the same shell with the emphasis reversed.
-

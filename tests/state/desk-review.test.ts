@@ -1,6 +1,6 @@
 // tests/state/desk-review.test.ts — review fixes 3-6 to the reducer
 import { describe, it, expect } from 'vitest'
-import { createDesk, applyFrame, settleDesk, type Desk } from '../../src/state/desk'
+import { createDesk, applyFrame, settleDesk, withSiblingWait, type Desk } from '../../src/state/desk'
 
 const d = (): Desk => createDesk('s1')
 const f = (type: string, data: unknown = {}) => ({ type, data })
@@ -36,24 +36,42 @@ describe('settleDesk — §6.3 success/failure fall back to the underlying state
   })
 })
 
-describe('applyFrame — only inbox.enqueued starts a sibling wait', () => {
-  it('does not flip a working desk on session.inbox.delivery.changed', () => {
-    const working = run(d(), f('session.text.delta'))
-    const next = applyFrame(working, f('session.inbox.delivery.changed'))
-    expect(next).toEqual(working)
+describe('applyFrame — inbox members never drive the desk (owner ruling 2026-10-13)', () => {
+  for (const t of ['session.inbox.enqueued', 'session.inbox.delivered', 'session.inbox.cancelled', 'session.inbox.delivery.changed', 'session.inbox.something.new']) {
+    it(`is a no-op for ${t}`, () => {
+      const waiting = withSiblingWait(run(d(), f('session.execution.started')), true)
+      expect(applyFrame(waiting, f(t))).toEqual(waiting)
+    })
+  }
+})
+
+describe('withSiblingWait — the wait for a running child, with §6.3 precedence', () => {
+  it('shows waiting-on-worker over working', () => {
+    const next = withSiblingWait(run(d(), f('session.execution.started')), true)
+    expect([next.status, next.caption, next.waitingOnSibling]).toEqual(['waiting-on-worker', 'waiting on another worker', true])
   })
-  it('leaves an existing wait alone on session.inbox.delivery.changed', () => {
-    const waiting = run(d(), f('session.inbox.enqueued'))
-    expect(applyFrame(waiting, f('session.inbox.delivery.changed'))).toEqual(waiting)
+  it('returns to working when the wait ends', () => {
+    const next = withSiblingWait(withSiblingWait(run(d(), f('session.execution.started')), true), false)
+    expect([next.status, next.waitingOnSibling]).toEqual(['working', false])
   })
-  it('ignores unknown inbox members for the flag and status', () => {
-    const idle = d()
-    expect(applyFrame(idle, f('session.inbox.something.new'))).toEqual(idle)
+  it('never overrides needs-you; only records the flag', () => {
+    const asked = run(d(), f('permission.asked', { id: 'p1' }))
+    const next = withSiblingWait(asked, true)
+    expect([next.status, next.waitingOnSibling]).toEqual(['waiting-on-you', true])
   })
-  it('clears the wait on session.inbox.cancelled', () => {
-    const next = run(d(), f('session.inbox.enqueued'), f('session.inbox.cancelled'))
-    expect(next.waitingOnSibling).toBe(false)
-    expect(next.status).toBe('working')
+  it('does not touch a held success, failure or idle desk', () => {
+    for (const desk of [run(d(), f('session.execution.succeeded')), run(d(), f('session.execution.failed')), d()]) {
+      const next = withSiblingWait(desk, true)
+      expect(next.status).toBe(desk.status)
+      expect(next.waitingOnSibling).toBe(true)
+    }
+  })
+  it('returns the same desk when nothing changes, and never mutates', () => {
+    const desk = run(d(), f('session.execution.started'))
+    const snap = JSON.stringify(desk)
+    expect(withSiblingWait(desk, false)).toBe(desk)
+    withSiblingWait(desk, true)
+    expect(JSON.stringify(desk)).toBe(snap)
   })
 })
 

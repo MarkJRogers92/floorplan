@@ -169,10 +169,20 @@ session's state does not depend on how we happened to learn about it.
 | `session.text.delta` | working |
 | `session.compaction.*` | working, caption "compacting" |
 | `permission.asked`, `form.created` | **waiting — needs you** |
-| `session.inbox.*` | waiting, caption "waiting on another worker" |
+| a parent whose child session (`session.created` with `parentID`) is busy | waiting, caption "waiting on another worker" |
+| `session.inbox.*` | no change — input arriving, not a wait (see note below the table) |
 | `session.execution.succeeded` | success, then idle after a short hold |
 | `session.execution.failed` / `.interrupted` | failure, then idle |
 | `session.created` / `.deleted` | desk appears / is removed |
+
+*Amended 2026-10-13 by owner ruling.* This table first mapped `session.inbox.*` to
+"waiting on another worker". OpenCode v2's inbox items are `user`, `synthetic`,
+`compaction` and `move`, and every prompt passes through `inbox.enqueued`, so that
+row made every prompt flash the state while a parent really blocked on a subagent
+showed "working" (verified on a live recording). The wait now comes from the session
+tree: the registry links children by `parentID`, and a parent waits while any child
+is working or itself waiting. `execution.interrupted` with reason `shutdown` is idle,
+not failure, as in OpenCode's own reducer.
 
 Two states must never collapse into one: **"needs you"** and **"waiting on another
 worker"**. The reference project learned this the hard way and encodes it in a

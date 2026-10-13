@@ -92,13 +92,11 @@ export function applyFrame(desk: Desk, frame: Frame): Desk {
   const data = dataOf(frame)
   const t = frame.type
 
-  // Sibling-wait bookkeeping happens whatever is showing, so it is right afterwards.
-  let waitingOnSibling = desk.waitingOnSibling
-  // Only `enqueued` starts a wait and only `delivered`/`cancelled` end one; any other
-  // inbox member (such as `delivery.changed`) leaves the flag and the status alone.
-  const inboxEnds = t === 'session.inbox.delivered' || t === 'session.inbox.cancelled'
-  if (inboxEnds) waitingOnSibling = false
-  else if (t === 'session.inbox.enqueued') waitingOnSibling = true
+  // Inbox items (user | synthetic | compaction | move) are input arriving, not a wait on
+  // another worker (owner ruling, 2026-10-13). The sibling wait is set by the registry,
+  // which knows a parent's children, through withSiblingWait.
+  if (t.startsWith('session.inbox.')) return { ...desk }
+  const waitingOnSibling = desk.waitingOnSibling
 
   if (desk.openPermission !== undefined) {
     if (settledID(frame, data) === desk.openPermission) {
@@ -113,15 +111,6 @@ export function applyFrame(desk: Desk, frame: Frame): Desk {
   const asked = askedID(frame, data)
   if (asked !== undefined) {
     return { ...desk, waitingOnSibling, status: 'waiting-on-you', caption: 'needs you', openPermission: asked }
-  }
-
-  if (t.startsWith('session.inbox.')) {
-    if (t !== 'session.inbox.enqueued' && !inboxEnds) return { ...desk }
-    if (waitingOnSibling) return { ...desk, waitingOnSibling, status: 'waiting-on-worker', caption: SIBLING_WAIT }
-    // The wait ended. If it was what we were showing, the input has landed: working.
-    return desk.status === 'waiting-on-worker'
-      ? { ...desk, waitingOnSibling, status: 'working', caption: 'working' }
-      : { ...desk, waitingOnSibling }
   }
 
   if (t === 'session.execution.succeeded') return { ...desk, status: 'success', caption: 'done' }
@@ -151,4 +140,24 @@ export function settleDesk(desk: Desk): Desk {
   if (desk.openPermission !== undefined) return { ...desk, status: 'waiting-on-you', caption: 'needs you' }
   if (desk.waitingOnSibling) return { ...desk, status: 'waiting-on-worker', caption: SIBLING_WAIT }
   return { ...desk, status: 'idle', caption: '' }
+}
+
+/**
+ * Set or clear the sibling wait: whether one of this worker's children is still busy.
+ * The registry decides `waiting`; this decides what it shows, with §6.3 precedence —
+ * an open request is never overridden, only the flag is recorded so the wait shows
+ * again when the request is settled. Only a `working` desk turns into a wait, and
+ * only a desk showing the wait turns back to `working`: a held success or failure,
+ * or an idle desk, keeps its status. Returns `desk` itself when nothing changes.
+ */
+export function withSiblingWait(desk: Desk, waiting: boolean): Desk {
+  if (desk.openPermission === undefined) {
+    if (waiting && desk.status === 'working') {
+      return { ...desk, waitingOnSibling: true, status: 'waiting-on-worker', caption: SIBLING_WAIT }
+    }
+    if (!waiting && desk.status === 'waiting-on-worker') {
+      return { ...desk, waitingOnSibling: false, status: 'working', caption: 'working' }
+    }
+  }
+  return desk.waitingOnSibling === waiting ? desk : { ...desk, waitingOnSibling: waiting }
 }

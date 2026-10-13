@@ -1,6 +1,6 @@
 // tests/state/desk.test.ts
 import { describe, it, expect } from 'vitest'
-import { createDesk, applyFrame, type Desk } from '../../src/state/desk'
+import { createDesk, applyFrame, withSiblingWait, type Desk } from '../../src/state/desk'
 
 const d = (): Desk => createDesk('s1')
 const f = (type: string, data: unknown = {}) => ({ type, data })
@@ -26,10 +26,13 @@ describe('applyFrame — the spec table (§6.3)', () => {
     expect(next.status).toBe('waiting-on-you')
     expect(next.openPermission).toBe('p1')
   })
-  it('goes waiting-on-worker on session.inbox events', () => {
-    const next = applyFrame(d(), f('session.inbox.enqueued'))
-    expect(next.status).toBe('waiting-on-worker')
-    expect(next.waitingOnSibling).toBe(true)
+  // Owner ruling 2026-10-13: inbox items are user|synthetic|compaction|move — input
+  // arriving, not a sibling wait. The wait now comes from a running child (withSiblingWait).
+  it('treats session.inbox events as input arriving, not a sibling wait', () => {
+    const working = applyFrame(d(), f('session.execution.started'))
+    const next = applyFrame(working, f('session.inbox.enqueued'))
+    expect(next).toEqual(working)
+    expect(next.waitingOnSibling).toBe(false)
   })
   it('holds success then the caller decides when to settle', () => {
     expect(statusOf(applyFrame(d(), f('session.execution.succeeded')))).toBe('success')
@@ -59,7 +62,7 @@ describe('applyFrame — precedence and clearing (§6.3)', () => {
     expect(next.status).toBe('idle')
   })
   it('shows needs-you over a sibling wait, and restores the wait afterwards', () => {
-    const waiting = applyFrame(d(), f('session.inbox.enqueued'))
+    const waiting = withSiblingWait(applyFrame(d(), f('session.execution.started')), true)
     const asked = applyFrame(waiting, f('permission.asked', { requestID: 'p1' }))
     expect(statusOf(asked)).toBe('waiting-on-you')
     const answered = applyFrame(asked, f('permission.replied', { requestID: 'p1' }))
@@ -125,16 +128,17 @@ describe('applyFrame — the real stream', () => {
     const done = applyFrame(d(), f('session.execution.succeeded'))
     expect(statusOf(applyFrame(done, f('session.execution.started')))).toBe('working')
   })
-  it('ends the sibling wait on session.inbox.delivered, so a later reply does not restore it', () => {
-    const waiting = applyFrame(d(), f('session.inbox.enqueued'))
-    const delivered = applyFrame(waiting, f('session.inbox.delivered'))
-    expect(delivered.waitingOnSibling).toBe(false)
-    const asked = applyFrame(delivered, f('permission.asked', { id: 'p1' }))
+  it('ends the sibling wait when the child is done, so a later reply does not restore it', () => {
+    const waiting = withSiblingWait(applyFrame(d(), f('session.execution.started')), true)
+    const done = withSiblingWait(waiting, false)
+    expect(done.waitingOnSibling).toBe(false)
+    expect(done.status).toBe('working')
+    const asked = applyFrame(done, f('permission.asked', { id: 'p1' }))
     expect(statusOf(applyFrame(asked, f('permission.replied', { requestID: 'p1' })))).toBe('working')
   })
   it('records a sibling wait that arrives while a permission is open, without showing it', () => {
     const asked = applyFrame(d(), f('permission.asked', { id: 'p1' }))
-    const both = applyFrame(asked, f('session.inbox.enqueued'))
+    const both = withSiblingWait(asked, true)
     expect(both.status).toBe('waiting-on-you')
     expect(both.waitingOnSibling).toBe(true)
   })

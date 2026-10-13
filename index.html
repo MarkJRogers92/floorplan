@@ -55,6 +55,28 @@
       }
       #director-notice { flex-basis: 100%; }
       #toolbar button:disabled { opacity: 0.55; cursor: default; }
+      #work-panel { flex: 0 0 auto; padding: 12px 16px; border-bottom: 1px solid #374151; background: #172033; }
+      #work-panel h1 { font-size: 19px; margin: 0 0 8px; }
+      #work-panel label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+      #work-fields { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+      #work-fields label { flex: 1 1 200px; min-width: 0; }
+      #work-panel input, #work-panel select, #work-panel textarea, #work-panel button {
+        font: inherit; color: #e5e7eb; background: #111827; border: 1px solid #4b5563; border-radius: 6px; padding: 8px; box-sizing: border-box;
+      }
+      #work-panel textarea { width: 100%; resize: vertical; min-height: 60px; max-height: 180px; }
+      #work-panel button { cursor: pointer; margin-top: 6px; margin-right: 6px; }
+      #work-panel button:disabled { opacity: .5; cursor: default; }
+      #work-panel #work-submit { background: #4338ca; border-color: #818cf8; }
+      #work-panel :focus-visible { outline: 2px solid #a5b4fc; outline-offset: 2px; }
+      #work-panel p { font-size: 12px; margin: 6px 0; color: #b3bed0; overflow-wrap: anywhere; }
+      #work-details { display: flex; flex-wrap: wrap; gap: 12px; }
+      #work-details details { flex: 1 1 300px; font-size: 12px; }
+      #work-messages, #work-permissions { max-height: 180px; overflow: auto; }
+      #work-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0; }
+      .work-permission { padding: 8px; border: 1px solid #fbbf24; border-radius: 6px; margin: 6px 0; }
+      #toolbar details { width: 100%; }
+      #toolbar summary { cursor: pointer; font-size: 13px; }
+      #advanced { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 8px; }
       .episode-optout { font-size: 12px; color: #9ca3af; }
       .cast-memory { margin: 6px 0 12px; padding: 6px 10px; border: 1px solid #374151; font-size: 12px; color: #9ca3af; }
       .cast-memory summary { cursor: pointer; color: #a5b4fc; }
@@ -148,15 +170,40 @@
   <body>
     <div id="app">
       <div id="toolbar">
+        <span id="status" role="status">connecting…</span>
+        <details><summary>Replay and optional Director</summary><div id="advanced">
+        <button id="live" type="button">Return to live</button>
         <button id="replay" type="button">Replay</button>
         <label for="recording">Load .jsonl</label>
         <input id="recording" type="file" accept=".jsonl" />
         <button id="director" type="button" disabled>Enable Director (sends scenes to OpenAI)</button>
         <span id="director-status" role="status">Director: templates</span>
         <span id="history-status" role="status">Local history: waiting for project footage</span>
-        <span id="status">connecting…</span>
         <span id="director-notice">Live episodes save privately on this machine; replays do not autosave. Optional Director sends scene text, paths, quotes and a bounded character-history/persona summary to OpenAI. Enabled Director can also spend on fresh replay scenes; disable it for free template-only replay. No key means templates only. Default cap: 30¢ per chat, $1 per server run.</span>
+        </div></details>
       </div>
+      <section id="work-panel" aria-label="Start and steer real work">
+        <h1>Give the team a job</h1>
+        <form id="work-form">
+          <div id="work-fields">
+            <label>Job<select id="work-job"><option value="">New job</option></select></label>
+            <label>Project directory<input id="work-project" list="work-projects" placeholder="Choose a project or enter its absolute folder path" required autocomplete="off" /><datalist id="work-projects"></datalist></label>
+            <label>Configured agent<select id="work-agent" required><option value="">Choose an agent…</option></select></label>
+          </div>
+          <label>Your prompt<textarea id="work-prompt" placeholder="What should the team build, fix or investigate?" maxlength="16000" required></textarea></label>
+          <button id="work-submit" type="submit" disabled>Start job</button>
+          <button id="work-load-agents" type="button" disabled>Load / refresh agents</button>
+          <button id="work-stop" type="button" disabled>Stop session</button>
+          <button id="work-refresh" type="button" disabled>Refresh conversation / requests</button>
+        </form>
+        <p>Starts real OpenCode work in the selected project. Tools may change files; your agent/model allowance or provider charges apply. Existing OpenCode permissions still apply. Director narration is separate.</p>
+        <p id="work-notice" role="status">Connecting to OpenCode…</p>
+        <div id="work-details">
+          <details><summary>Real conversation — latest 30 messages</summary><div id="work-messages"></div></details>
+          <details open><summary>Requests needing you</summary><div id="work-permissions"></div></details>
+        </div>
+        <p id="work-roster"></p>
+      </section>
       <div id="stage">
         <div id="script" role="region" aria-label="Episode script"></div>
         <div id="floor"><div id="room"><canvas id="canvas"></canvas></div><div id="stage-cue" tabindex="0">Dramatised reactions; desk colours show real states.</div></div>

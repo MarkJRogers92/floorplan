@@ -34,7 +34,8 @@ Where documents disagree, the spec wins.
 
 ## State: 12 of 12 tasks complete
 
-**127 tests, 13 files, `bun run typecheck` clean.** Every task was reviewed by an agent
+**Original foundation baseline:127 tests/13 files. Current tree:552 tests/55 files,
+typecheck/build clean.** Every task was reviewed by an agent
 that did not write it, plus one final whole-branch review.
 
 ```sh
@@ -48,8 +49,9 @@ bun run dev         # the page — serves the room; needs `opencode serve` for l
 status, drawn from real events — live, or from a `.jsonl` recording via the Replay
 button — **with a script beside it narrating the work**. Every script line traces to
 the beats it cites (hover a line to see them); every beat traces to its event ids.
-Nothing else. The rail, the transcript and permission-answering are **not**
-built; they were deferred and are the remaining part of the spec's "done means".
+The page now also starts and steers real work: explicit project/agent/prompt controls,
+selected-job views, actual conversation, interrupt and scoped allow-once/reject approvals.
+See `docs/work.md`. Structured questions still need OpenCode; full office art is deferred.
 
 ### The code, by responsibility
 
@@ -78,6 +80,8 @@ built; they were deferred and are the remaining part of the spec's "done means".
 | `server/series-store.ts`, `src/dev/series-route.ts`, `http-guard.ts` | private atomic local files and guarded loopback archive/context routes |
 | `src/app/series-client.ts` | nonblocking live milestone saves, read-through context and visible storage status; no replay saves |
 | `src/app/cast-memory.ts` | validated displayed-context projection and current-cast memory cards; no fabricated identities or recap lines |
+| `src/app/work-client.ts`, `work.ts`, `work-panel.ts`, `work-scope.ts` | validated V2 job admission, race-safe controls, actual conversation/approvals and selected-job/Director scope |
+| `src/app/replay-controls.ts` | generation-guarded file playback/return-live binding; obsolete frames and completion callbacks dropped |
 | `src/narrative/recap.ts`, `src/app/recap-client.ts`, `script-view.ts` | bounded earlier-footage proof montage, reset-safe local reads and text-safe script/memory/recap DOM |
 | `src/room/stage.ts`, `assets/worker.*` | reception-clock reaction cues and layered, hand-authored five-pose monitor-clerk sheet |
 | `src/room/{layout,room}.ts` | pure geometry, then canvas drawing |
@@ -265,6 +269,29 @@ fixes and all493 tests, with no remaining Critical/Important findings. Integrati
 `.superpowers/sdd/2026-10-13-recaps-and-stage/progress.md` ledger.
 
 Plot labels, individual character designs and full office animation remain next.
+**Prompt-to-work follow-up:** owner confirmed the missing direct-input workflow after
+finding the old monitor confusing. The obvious form creates a root at the explicitly
+chosen directory/agent, sends execution-enabled input, retains the selected root/draft
+on failure and reuses an uncertain input's message ID only on explicit identical retry.
+No automatic POST retries, no model/permission overrides and no hidden-agent selection.
+Existing job metadata is authoritative; follow-ups never move it. Replay refuses all
+mutations and return-live invalidates obsolete reads/playback. Actual conversation and
+scoped approvals settle independently, so a failed/hung transcript cannot hide approval
+cards or lock the controls. Unknown/other-job requests are counted, not inferred absent.
+Selected-job evidence also scopes Director updates; already-sent calls cannot be refunded.
+
+552tests/55files include API wire, replay, scope and controller race regressions.
+Independent Space Bunny review found project-default approval reads, coupled transcript
+failure, silent unrelated requests, uncertain-create wording, a hung-refresh panel lock
+and stale failure notices; all verified fixes are regression tested. A later old receipt
+cannot delete a newer uncertain input's retry ID. Speculative concern that the engine
+rewrites message IDs was disproved by the controlled real nonexecuting probe: explicit
+temp-folder/agent preserved, caller ID/text/delivery echoed, duplicate200 leaves1 queued
+input, cost0, idle interruptfalse. No executing prompt/model acceptance call, no private
+recordings/keys submitted to workers. Synthetic-page assertions prove the full UI wire
+flow; whole-page screenshots/keyboard operation remain unverified because its browser
+window was hidden. Actual participants: Sol integration, DeepSeekAPI client, Space Bunny
+independent review. See `docs/work.md` for limits and the retained nonexecuting probe chat.
 Before extending episode lifecycle, read the slice-2 execution notes;
 that plan's original timeout contradicted D2 and was not implemented.
 The same notes record final review rulings and deferred minors. In particular,

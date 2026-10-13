@@ -8,6 +8,9 @@ import { createSeriesClient } from './app/series-client'
 import { createRecapClient } from './app/recap-client'
 import { scriptRow, memoryElement, recapElement } from './app/script-view'
 import { castMemoryCards } from './app/cast-memory'
+import { mountWorkPanel } from './app/work-panel'
+import { bindReplayControls } from './app/replay-controls'
+import { beatsForWork } from './app/work-scope'
 import { scopeFromSnapshot, seriesKeyForRoot } from './narrative/scope'
 import { rootFor } from './narrative/cast'
 import type { DirectorState } from './narrative/director'
@@ -15,8 +18,6 @@ import { createDirectorRuntime } from './narrative/director-runtime'
 import { createRollup, flush as flushRollup, rollup as rollFrame, seedRollup } from './narrative/rollup'
 import type { Beat } from './narrative/types'
 import { assembleEpisodeViews } from './narrative/views'
-import { parseRecording } from './replay/parse'
-import { replayFrames } from './replay/play'
 import { createRoom } from './room/room'
 import { createStageRuntime } from './room/stage'
 
@@ -30,6 +31,10 @@ const directorBtn = document.getElementById('director') as HTMLButtonElement
 const directorStatus = document.getElementById('director-status')!
 const historyStatus = document.getElementById('history-status')!
 const stageCue = document.getElementById('stage-cue')!
+const work = mountWorkPanel(document.getElementById('work-panel')!, () => { renderNarrative(); resize() }, session => {
+  rollState = seedRollup(rollState, { sessions: [{ id: session.id, agent: session.agent, seriesKey: `directory:${session.directory}` }], permissions: [] })
+  renderNarrative()
+})
 
 const floor = createFloor()
 const workerImage = new Image()
@@ -41,7 +46,11 @@ let lastStageBeat: Beat | undefined
 let liveAbort: AbortController | null = null
 
 function draw() {
-  const desks = floor.desks()
+  const selected = work.selectedID()
+  const desks = floor.desks().filter(d => {
+    const root = rootFor(d.sessionID, rollState.sessions)
+    return !replaying && selected ? root === selected : observedRoots.has(root)
+  })
   const frames = stage.frames(performance.now(), reducedMotion.matches)
   room.draw(desks, frames)
   const actor = lastStageBeat && 'childSessionID' in lastStageBeat.detail ? lastStageBeat.detail.childSessionID : lastStageBeat?.sessionID
@@ -71,6 +80,7 @@ function setStatus(text: string, isError = false) {
  */
 let rollState = seedRollup(createRollup(), { sessions: [], permissions: [] })
 let beats: Beat[] = []
+let observedRoots = new Set<string>()
 let narrativeFlushed = false
 let replaying = false
 let directorEnabled = false
@@ -153,6 +163,7 @@ function resetNarrative() {
   stage.reset(); lastStageBeat = undefined
   rollState = seedRollup(createRollup(), { sessions: [], permissions: [] })
   beats = []
+  observedRoots.clear()
   narrativeFlushed = false
   scriptEl.replaceChildren()
 }
@@ -160,13 +171,13 @@ function resetNarrative() {
 /** Rebuild the pure episode view so newly learned cast names and scene cuts stay current. */
 function narrate(arrived: Beat[], flushed = false) {
   beats.push(...arrived)
+  observedRoots = new Set(beats.map(b => rootFor(b.sessionID, rollState.sessions)))
   stage.update(arrived, performance.now())
   if (arrived.length) lastStageBeat = arrived[arrived.length - 1]
   if (flushed) narrativeFlushed = true
   history.update(beats, [...rollState.sessions.values()], replaying)
   historyStatus.textContent = history.status()
   recaps.update(beats, [...rollState.sessions.values()], replaying)
-  director.update(beats, [...rollState.sessions.values()], narrativeFlushed, !replaying)
   renderNarrative()
 }
 
@@ -175,8 +186,10 @@ function renderNarrative() {
     .filter(d => d.open).map(d => d.dataset.memory))
   const sessions = [...rollState.sessions.values()]
   const index = rollState.sessions
+  const focused = beatsForWork(beats, index, work.selectedID(), replaying)
+  director.update(focused, sessions, narrativeFlushed, !replaying)
   const content = document.createDocumentFragment()
-  for (const view of assembleEpisodeViews(beats, sessions, director.results())) {
+  for (const view of assembleEpisodeViews(focused, sessions, director.results())) {
     const episode = document.createElement('section')
     episode.dataset.episode = view.episode.id
     episode.append(scriptRow(view.heading, 'episode'))
@@ -213,6 +226,7 @@ function renderNarrative() {
     content.append(episode)
   }
   scriptEl.replaceChildren(content)
+  if (!scriptEl.childElementCount) scriptEl.textContent = 'Start a job above, or select an existing job. New activity appears here; saved messages are in Real conversation.'
   scriptEl.scrollTop = scriptEl.scrollHeight
 }
 
@@ -222,20 +236,21 @@ function pushFrame(frame: Frame) {
   const folded = rollFrame(rollState, frame)
   rollState = folded.state
   if (folded.beats.length || priorSessions !== rollState.sessions) narrate(folded.beats)
+  work.push(frame)
   draw()
 }
 
-async function fetchService(): Promise<Service | null> {
+async function fetchService(current = () => true): Promise<Service | null> {
   const res = await fetch('/__service')
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: 'unknown error' }))
-    setStatus(body.error ?? `service route returned ${res.status}`, true)
+    if (current()) setStatus(body.error ?? `service route returned ${res.status}`, true)
     return null
   }
   return res.json()
 }
 
-async function seedFromREST(service: Service) {
+async function seedFromREST(service: Service, current = () => true) {
   const [sessionsRes, permissionsRes, formsRes] = await Promise.all([
     authedFetch(service, '/api/session'),
     authedFetch(service, '/api/permission/request'),
@@ -252,15 +267,18 @@ async function seedFromREST(service: Service) {
       }))
     : []
 
-  const forms = formsRes.ok
-    ? ((await formsRes.json()).data ?? []).map((f: { id: string; sessionID: string }) => ({
+  const rawForms = formsRes.ok ? ((await formsRes.json()).data ?? []) : []
+  const forms = rawForms.map((f: { id: string; sessionID: string }) => ({
         requestID: f.id,
         sessionID: f.sessionID,
       }))
-    : []
+
+  if (!current()) return
 
   const requests = [...permissions, ...forms]
   floor.setSnapshot(sessions, requests)
+  work.updateSessions(sessions)
+  work.updateQuestions(rawForms)
   // Seed the narrative the same way (§4.1): a session we joined mid-turn still has a
   // root and a cast member. Sessions without a parentID on the wire are taken for roots.
   rollState = seedRollup(rollState, {
@@ -278,60 +296,48 @@ async function seedFromREST(service: Service) {
 
 async function startLive(service: Service) {
   liveAbort?.abort()
-  liveAbort = new AbortController()
+  const controller = new AbortController()
+  liveAbort = controller
   setStatus('live')
   try {
-    await streamFrames(service, '/api/event', pushFrame, liveAbort.signal)
+    await streamFrames(service, '/api/event', frame => {
+      if (liveAbort === controller && !controller.signal.aborted && !replaying) pushFrame(frame)
+    }, controller.signal)
   } catch (err) {
-    if ((err as Error).name === 'AbortError') return
+    if ((err as Error).name === 'AbortError' || liveAbort !== controller || controller.signal.aborted) return
     setStatus((err as Error).message, true)
   }
 }
 
-async function connect(service: Service) {
+async function connect(service: Service, current = () => true) {
+  liveAbort?.abort()
   replaying = false
   resetNarrative()
-  await seedFromREST(service)
-  startLive(service)
+  work.connect(service)
+  await seedFromREST(service, current)
+  if (current()) startLive(service)
 }
 
 async function start() {
+  const current = playback.current()
   try {
-    const service = await fetchService()
-    if (!service) return
-    await connect(service)
+    const service = await fetchService(current)
+    if (!service || !current()) return
+    await connect(service, current)
   } catch (err) {
-    setStatus((err as Error).message, true)
+    if (current()) setStatus((err as Error).message, true)
   }
 }
 
-replayBtn.addEventListener('click', () => {
-  const file = fileInput.files?.[0]
-  if (!file) {
-    setStatus('choose a .jsonl recording first', true)
-    return
-  }
-  liveAbort?.abort()
-  replaying = true
-  resetNarrative()
-  file
-    .text()
-    .then(text => {
-      const frames = parseRecording(text)
-      setStatus(`replaying ${frames.length} frames`)
-      return replayFrames(frames, pushFrame, 250)
-    })
-    .then(() => {
-      // §4.1's flush: runs still open when the footage stops close with the events they have.
-      narrate(flushRollup(rollState), true)
-      setStatus('replay done')
-    })
-    .catch(err => setStatus(err.message, true))
-})
-
-fileInput.addEventListener('change', () => {
-  const file = fileInput.files?.[0]
-  replayBtn.textContent = file ? `Replay ${file.name}` : 'Replay'
+const playback = bindReplayControls(replayBtn, fileInput, document.getElementById('live') as HTMLButtonElement, {
+  enterReplay() { liveAbort?.abort(); replaying = true; work.setReplay(true); resetNarrative(); draw() },
+  push: pushFrame,
+  finish: () => narrate(flushRollup(rollState), true),
+  status: setStatus,
+  async returnLive(current) {
+    const service = await fetchService(current)
+    if (service && current()) await connect(service, current)
+  },
 })
 
 function resize() {
@@ -342,6 +348,7 @@ function resize() {
 }
 
 window.addEventListener('resize', resize)
+document.addEventListener('toggle', resize, true)
 resize()
 start()
 void refreshDirectorState()

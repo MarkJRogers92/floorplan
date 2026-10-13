@@ -37,9 +37,10 @@ export type BeatDetail =
 
 export type Beat = {
   /**
-   * `b:<event id>` — the id of the frame that raised the beat. For a beat raised by
-   * one frame that is that frame's own id; for a run it is the frame that closes it.
-   * Never invented, so a replay of the same frames yields the same ids.
+   * `b:<the beat's first event id>` — where the beat *started*, which for a run is its
+   * opening frame, never the frame that closed it. When that first event carries no id
+   * at all the id is `b:<kind>:<session>:<at>`: ugly but stable and unique, because a
+   * beat is never dropped for want of an id.
    */
   id: string
   /** `created` of the beat's first event — the run's start for a run. 0 if the wire carried none. */
@@ -67,13 +68,18 @@ export type SessionInfo = {
 export type OpenRun = {
   sessionID: string
   kind: 'thinks' | 'says'
-  /** The id this run's beat is anchored by when it is closed at flush. */
-  firstEventID: string
   at: number
   eventIDs: string[]
   /** Deltas only: the frames that carried the worker's actual words. */
   deltas: number
 }
+
+/**
+ * The session's `execution.started` frame — the start of its latest turn of work.
+ * It raises no beat of its own (§4.1 absorbs it), but the first run raised inside that
+ * turn is named there, because a run is named where its work began.
+ */
+export type Turn = { id?: string; at: number }
 
 /** The rollup's whole memory. Replaced, never mutated — the reducer stays pure. */
 export type RollupState = {
@@ -89,6 +95,8 @@ export type RollupState = {
   roots: Set<string>
   /** Requests asked and not yet answered, requestID → sessionID: the audience is being asked. */
   pending: Map<string, string>
+  /** Each session's open turn of work, waiting for the first run it names. */
+  turn: Map<string, Turn>
 }
 
 /**

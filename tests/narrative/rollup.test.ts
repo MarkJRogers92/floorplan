@@ -33,7 +33,7 @@ describe('dedupe — a reconnect replays frames we have already seen', () => {
     let s = createRollup()
     const emitted: string[] = []
     for (const fr of frames) { const r = rollup(s, fr); s = r.state; emitted.push(...r.beats.map(x => x.id)) }
-    expect(emitted).toEqual(['b:d'])
+    expect(emitted).toEqual(['b:a'])
     expect(flush(s)).toEqual([])
   })
 
@@ -186,6 +186,49 @@ describe('the rules the tests above leave implicit', () => {
     const r = rollup(s, f('inbox.enqueued', { sessionID: 'child', item: { type: 'synthetic' } }, { id: 'evt1' }))
     expect(r.beats.map(b => b.kind)).toEqual(['guest-arrives'])
     expect(r.beats[0].detail).toEqual({ kind: 'guest-arrives', childSessionID: 'child' })
+  })
+
+  // Finding 1: a beat is named by its FIRST event. Naming the frame that raised it would
+  // give 'b:d' here — this is the test that fails if the id rule goes back.
+  it('names a run where it started, never where it closed', () => {
+    let s = createRollup()
+    const out: Beat[] = []
+    for (const fr of [
+      f('execution.started', { sessionID: 'x' }, { id: 'a', created: 100 }),
+      f('reasoning.started', { sessionID: 'x' }, { id: 'b', created: 200 }),
+      f('reasoning.delta', { sessionID: 'x' }, { id: 'c', created: 300 }),
+      f('reasoning.ended', { sessionID: 'x' }, { id: 'd', created: 400 }),
+    ]) { const r = rollup(s, fr); s = r.state; out.push(...r.beats) }
+    expect(out).toHaveLength(1)
+    expect(out[0].id).toBe('b:a')
+    expect(out[0].at).toBe(100)
+    expect(out[0].eventIDs).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  it('names a run at its own first frame when we never saw the turn start', () => {
+    let s = seedRollup(createRollup(), { sessions: [{ id: 'x' }], permissions: [] })
+    const out: Beat[] = []
+    for (const fr of [
+      f('reasoning.started', { sessionID: 'x' }, { id: 'a', created: 100 }),
+      f('reasoning.ended', { sessionID: 'x' }, { id: 'd', created: 400 }),
+    ]) { const r = rollup(s, fr); s = r.state; out.push(...r.beats) }
+    expect(out[0].id).toBe('b:a')
+    expect(out[0].eventIDs).toEqual(['a', 'd'])
+  })
+
+  // Finding 2: no bare 'b:' — a stable fallback, and the beat is never dropped.
+  it('falls back to a stable id when the first event carries no id', () => {
+    const s = seedRollup(createRollup(), { sessions: [{ id: 'x' }], permissions: [] })
+    const r = rollup(s, f('permission.asked', { sessionID: 'x', id: 'p1' }, { created: 7 }))
+    expect(r.beats[0].id).toBe('b:knocks:x:7')
+    expect(r.beats[0].eventIDs).toEqual([])
+  })
+
+  it('does the same for a session we joined with an id-less first frame', () => {
+    const s = seedRollup(createRollup(), { sessions: [{ id: 'root' }], permissions: [] })
+    const r = rollup(s, f('execution.started', { sessionID: 'root' }))
+    expect(r.beats.map(b => b.kind)).toEqual(['episode-opens'])
+    expect(r.beats[0].id).toBe('b:episode-opens:root:0')
   })
 })
 

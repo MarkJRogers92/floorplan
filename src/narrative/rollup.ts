@@ -4,19 +4,27 @@
  * every timestamp is a frame's own `created`, so a recording replays to a
  * byte-identical beat list.
  *
- * The rule that buys that, and the one rule nothing here may bend: **a frame with no
- * `id` can never start a beat**. A beat is named by the frame that raised it, so a
- * frame with no id has no name to give it; and an id we never recorded cannot be
- * deduped, so a reconnect could raise its beat a second time. Such a frame is only
- * ever joined to a beat another frame started — a delta joining its run, a join
- * frame attaching to its call. `episode-opens` is the single exception: §4.1 raises
- * it for a session we joined mid-stream, from whichever frame first shows that
- * session, and that frame may well carry no id; its name then degrades to a bare
- * `b:`, which is still deterministic.
+ * A beat's name is its first event's id — `b:<event id>` — so a beat is named where it
+ * *started*, never where it closed, and its `at` is that same event's `created`. The
+ * rules that make that hold:
+ *
+ *  - Every non-duplicate id is recorded as seen **before** any rule runs, so a frame a
+ *    reconnect replays is dropped outright rather than opening a second run.
+ *  - A frame with no `id` can never open a run: there is nothing to name it by, and an id we
+ *    never recorded cannot be deduped, so a replay of it would raise the beat twice. Such a
+ *    frame only ever joins a beat another frame started.
+ *  - A beat whose first event has no id at all — an immediate beat raised by an id-less
+ *    frame — falls back to `b:<kind>:<session>:<at>`: ugly, but stable and unique in every
+ *    case we can reach, which a bare `b:` is not. Beats are never dropped for want of an id:
+ *    losing real work because the platform omitted one is the worse failure.
+ *  - `episode-opens` is raised by the first frame that shows a session we joined, id or no id,
+ *    because §4.1 has the episode open — which is where that fallback earns its keep.
  */
 
 import type { Frame } from '../api/sse'
-import type { Beat, BeatDetail, BeatKind, NarrativeSnapshot, OpenRun, RollupState, SessionInfo } from './types'
+import type {
+  Beat, BeatDetail, BeatKind, NarrativeSnapshot, OpenRun, RollupState, SessionInfo, Turn,
+} from './types'
 
 type Data = Record<string, unknown>
 
@@ -25,6 +33,14 @@ const num = (v: unknown): number | undefined =>
   typeof v === 'number' && Number.isFinite(v) ? v : undefined
 const dataOf = (frame: Frame): Data =>
   typeof frame.data === 'object' && frame.data !== null ? (frame.data as Data) : {}
+
+/**
+ * A beat's name: its first event's id, so the beat is named where it started and a
+ * replay names it the same. Only a beat whose first event has no id at all — reachable
+ * only from a frame handed to us without one — takes the fallback.
+ */
+const beatID = (eventIDs: string[], kind: BeatKind, sessionID: string, at: number): string =>
+  eventIDs[0] !== undefined ? `b:${eventIDs[0]}` : `b:${kind}:${sessionID}:${at}`
 
 /**
  * OpenCode prefixes session frames (`session.execution.started`) and the spec writes
@@ -63,8 +79,18 @@ const formID = (data: Data): string | undefined => {
 const setSession = (sessions: Map<string, SessionInfo>, info: SessionInfo): Map<string, SessionInfo> =>
   new Map(sessions).set(info.id, info)
 
+const setTurn = (turn: Map<string, Turn>, sessionID: string, value: Turn | undefined): Map<string, Turn> => {
+  const next = new Map(turn)
+  if (value === undefined) next.delete(sessionID)
+  else next.set(sessionID, value)
+  return next
+}
+
 export function createRollup(): RollupState {
-  return { seenIDs: new Set(), sessions: new Map(), open: new Map(), roots: new Set(), pending: new Map() }
+  return {
+    seenIDs: new Set(), sessions: new Map(), open: new Map(),
+    roots: new Set(), pending: new Map(), turn: new Map(),
+  }
 }
 
 /**
@@ -112,11 +138,14 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
   let roots = state.roots
   let open = state.open
   let pending = state.pending
+  let turn = state.turn
   const beats: Beat[] = []
 
-  /** A beat raised by this frame alone. Its name is this frame's id, or `b:` if it has none. */
-  const raise = (kind: BeatKind, subject: string, detail: BeatDetail): Beat =>
-    ({ id: `b:${id ?? ''}`, at, eventIDs: id === undefined ? [] : [id], kind, sessionID: subject, detail })
+  /** A beat raised by this frame alone: its one event is the frame's own. */
+  const raise = (kind: BeatKind, subject: string, detail: BeatDetail): Beat => {
+    const eventIDs = id === undefined ? [] : [id]
+    return { id: beatID(eventIDs, kind, subject, at), at, eventIDs, kind, sessionID: subject, detail }
+  }
 
   // --- the cast: who this session is, and who its parent is (§4.1 seeding) --------
 
@@ -214,6 +243,7 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
   }
 
   if (type === 'execution.succeeded') {
+    turn = setTurn(turn, sessionID, undefined) // the turn is over; the next one opens on its own `execution.started`
     beats.push(raise('wrap', sessionID, { kind: 'wrap' }))
   }
 
@@ -221,13 +251,23 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
   // agrees the session merely stopped — but the story still stops, so it is a cut,
   // carrying the reason.
   if (type === 'execution.failed' || type === 'execution.interrupted') {
+    turn = setTurn(turn, sessionID, undefined)
     beats.push(raise('cut', sessionID, { kind: 'cut', reason: str(data.reason) ?? '' }))
+  }
+
+  // `execution.started` opens the session's turn of work. §4.1 absorbs it — it raises no
+  // beat of its own — but a run is named where its work *began*, so the first run raised
+  // inside this turn takes this frame as its first event (and therefore as its id and its
+  // `at`). Recorded for unknown sessions too: a work stream is a work stream.
+  if (type === 'execution.started' && sessionID !== '') {
+    turn = setTurn(turn, sessionID, { id, at })
   }
 
   // --- runs: a think or a say, from its first frame to its last (§4.1) -------------
   // A run opens on `X.started`, or on the first `X.delta` when we joined mid-run, and
-  // closes on `X.ended`; the beat is raised by the frame that closes it, with the
-  // delta count and the whole run's event ids.
+  // closes on `X.ended`. Its beat is emitted at the close, because only then is the delta
+  // count known — but it is *named* where it started: the turn's `execution.started` if the
+  // work began before we saw the run, else the frame that opened it.
 
   const part = type.endsWith('.started') ? 'started'
     : type.endsWith('.delta') ? 'delta'
@@ -247,7 +287,7 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
         open = next
         const eventIDs = id === undefined ? current.eventIDs : [...current.eventIDs, id]
         beats.push({
-          id: `b:${id ?? current.firstEventID}`,
+          id: beatID(eventIDs, current.kind, current.sessionID, current.at),
           at: current.at,
           eventIDs,
           kind: current.kind,
@@ -268,14 +308,18 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
     } else if (id !== undefined) {
       // We joined mid-run: no `X.started` was seen, so this first delta raises the run.
       // A frame with no id cannot — there would be nothing to name the beat by.
+      const opened = turn.get(sessionID)
+      const from = opened !== undefined && opened.id !== undefined ? opened : undefined
+      if (from !== undefined) turn = setTurn(turn, sessionID, undefined) // spent on this run
+      const eventIDs = from === undefined ? [id] : [from.id as string, id]
       open = new Map(open).set(key, {
-        sessionID, kind: runKind, firstEventID: id, at,
-        eventIDs: [id], deltas: part === 'delta' ? 1 : 0,
+        sessionID, kind: runKind, at: from?.at ?? at, eventIDs,
+        deltas: part === 'delta' ? 1 : 0,
       })
     }
   }
 
-  return { state: { seenIDs, sessions, open, roots, pending }, beats }
+  return { state: { seenIDs, sessions, open, roots, pending, turn }, beats }
 }
 
 /**
@@ -287,7 +331,7 @@ export function flush(state: RollupState): Beat[] {
   const beats: Beat[] = []
   for (const run of state.open.values()) {
     beats.push({
-      id: `b:${run.firstEventID}`,
+      id: beatID(run.eventIDs, run.kind, run.sessionID, run.at),
       at: run.at,
       eventIDs: run.eventIDs,
       kind: run.kind,

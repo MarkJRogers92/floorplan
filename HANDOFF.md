@@ -46,7 +46,9 @@ bun run dev         # the page — serves the room; needs `opencode serve` for l
 
 **What runs today:** a canvas room with one desk per OpenCode session, coloured by
 status, drawn from real events — live, or from a `.jsonl` recording via the Replay
-button. Nothing else. The rail, the transcript and permission-answering are **not**
+button — **with a script beside it narrating the work**. Every script line traces to
+the beats it cites (hover a line to see them); every beat traces to its event ids.
+Nothing else. The rail, the transcript and permission-answering are **not**
 built; they were deferred and are the remaining part of the spec's "done means".
 
 ### The code, by responsibility
@@ -62,10 +64,17 @@ built; they were deferred and are the remaining part of the spec's "done means".
 | `src/state/seed.ts` | seed the floor from a REST snapshot |
 | `src/state/registry.ts` | the desk `Map`, tombstones, parent/child links |
 | `src/replay/{parse,play,replay}.ts` | replay a recording; `play.ts` is the browser-safe one |
+| `src/narrative/rollup.ts`, `calls.ts`, `silence.ts` | **the narrative rollup** — frames to beats, pure and deterministic |
+| `src/narrative/types.ts` | `Beat`, `BeatDetail`, `BeatKind`, cast and rollup state |
+| `src/narrative/line.ts`, `vocabulary.ts` | slots, the lint, delivery marks |
+| `src/narrative/templates.ts` | one template per beat kind, in the settled voice |
+| `src/narrative/cast.ts` | cast ids from sessions |
+| `src/narrative/script.ts` | beats to script lines, dropping rejected ones |
 | `src/room/{layout,room}.ts` | pure geometry, then canvas drawing |
 | `src/app/floor.ts` | `createFloor` — the object the page owns |
-| `src/main.ts`, `index.html` | the page |
+| `src/main.ts`, `index.html` | the page — script primary column, floor panel beside it |
 | `src/dev/service-route.ts`, `vite.config.ts` | the dev-only `GET /__service` credential route |
+| `fixtures/narrative/four-events.jsonl` | scrubbed golden recording: a failing command, a denied permission, a 40 s gap, a resumed chat |
 
 ## Conventions — how work is done here
 
@@ -137,19 +146,16 @@ green against recordings and a `curl`, not against pixels. Run `bun run dev` wit
 
 ## Next
 
-**The narrative layer, and it needs a plan.** Its design is written and reviewed
-(revision 3). Its own suggested first slice is: re-record with the frame fields the
-narrative needs, then the pure `rollup` with golden tests, then template lines rendered
-as a script beside the floor — the Director, jokes and all, comes last on purpose,
-because a joke on top of an uncited line is the one failure that design cannot recover
-from.
+**The narrative layer's slice 1 is built and merged** (6 tasks, 220 tests): the pure
+rollup with golden tests against a real recording, template lines with typed slots and
+the lint, and the script rendered as the primary column beside the floor. The Director,
+talking heads, recaps, titles, the §5.2 checker and §4.2 scene rules are deliberately
+not built — they are slice 2, and the design sequences the Director last on purpose.
 
-Two of its preconditions are already met: `Frame` now keeps `created` and `location`,
-and the room reads only `status`, so the narrative can be added without disturbing it.
-
-**One investigation does need doing before the rollup's rules are final:** §4.1 flags
-that `tool-fails` probably misses real failures, because a non-zero shell exit may
-arrive as a `tool.success`. Record a deliberate failure of each tool and settle it.
+The `tool-fails` rule is settled by evidence, not intuition: a non-zero shell exit
+arrives as `tool.success` carrying `metadata.exit` (verified on the wire, with the
+`shell.exited` join arriving 22 ms *after* the success) — so the rule reads the
+success first and falls back to the join.
 
 **Owner decisions still open** (§12 of the narrative design): the tone; whether an
 episode is a chat or a project; who the Human is; where model calls run and with what

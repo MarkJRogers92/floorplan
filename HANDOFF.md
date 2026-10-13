@@ -1,224 +1,167 @@
 # Handoff — floorplan
 
-Written 2026-10-12. A fresh agent (or human) should be able to pick this up from
-this file alone.
+Updated 2026-10-13. The foundation is **complete**; this describes a finished thing plus
+what comes next, so it should read differently from the version that described work in
+progress.
 
 ## What this is
 
 `floorplan` is a workspace for **OpenCode** that turns a coding session into a
-**followable narrative**. Long term it shows your agents as a pixel-art office
-where the work is *staged* — an AI sitcom you watch. Right now the goal is a thin,
-honest foundation: real state from real events, no mock data anywhere.
+**followable narrative**. The end state is an AI sitcom: real work, staged as story,
+rendered as a pixel-art office you watch. The foundation built the floor and the whole
+data path underneath it.
 
 Two documents are the authority, in this order:
 
 1. **Spec (binding):** `docs/superpowers/specs/2026-10-12-pixel-office-design.md`
 2. **Plan (its argument):** `docs/superpowers/plans/2026-10-12-foundation-connect-and-room.md`
 
-Where they disagree, the spec wins.
+The next subsystem already has its design:
+`docs/superpowers/specs/2026-10-12-narrative-layer-design.md` (revision 3).
+
+Where documents disagree, the spec wins.
 
 ## Where things are
 
-- **Repo:** https://github.com/MarkJRogers92/floorplan — public, MIT.
+- **Repo:** https://github.com/MarkJRogers92/floorplan — public, MIT. **`main` is the trunk and the default branch.**
 - **Local:** `~/Developer/floorplan`
-- **Branch:** `foundation` — this is also GitHub's default branch. `main` exists
-  locally with the two documents only; it is behind and one day should be brought
-  forward and made the default.
-- **The SDD ledger** (per-task detail, rulings, deferred minors) lives at
+- **Also on disk:** `~/Developer/floorplan-claude` — a git worktree used for the parallel half of the work. Its branch `claude/data-and-narrative` was merged and was never pushed. It is host-owned; delete it when you are done with it. `git worktree remove ~/Developer/floorplan-claude`
+- **The ledger** — per-task detail, every ruling, every deferred minor — is at
   `.superpowers/sdd/2026-10-12-foundation-connect-and-room/progress.md`. It is
-  **git-ignored, so a fresh clone will not have it.** Everything durable from it is
-  repeated in this file; if you have the local checkout, read it too.
+  **git-ignored, so a clone will not have it.** Read it if the local checkout is still
+  there; the durable parts are in this file and in git history.
+- `git log --oneline main | head -40` is the real record.
+
+## State: 12 of 12 tasks complete
+
+**127 tests, 13 files, `bun run typecheck` clean.** Every task was reviewed by an agent
+that did not write it, plus one final whole-branch review.
+
+```sh
+bun install
+bun run test        # vitest
+bun run typecheck   # tsc --noEmit
+bun run dev         # the page — serves the room; needs `opencode serve` for live desks
+```
+
+**What runs today:** a canvas room with one desk per OpenCode session, coloured by
+status, drawn from real events — live, or from a `.jsonl` recording via the Replay
+button. Nothing else. The rail, the transcript and permission-answering are **not**
+built; they were deferred and are the remaining part of the spec's "done means".
+
+### The code, by responsibility
+
+| Path | What it is |
+|---|---|
+| `src/api/service.ts` | reads `~/.local/state/opencode/service.json` — Node-only |
+| `src/api/client.ts` | the one authed `fetch`; browser-safe base64 |
+| `src/api/sse.ts` | `Frame` and the SSE frame parser; keeps `created` and `location` |
+| `src/api/stream.ts` | `fetch`-streaming live reader (`EventSource` cannot send the auth header) |
+| `src/record/recorder.ts`, `src/cli/connect.ts` | record a stream to `.jsonl` |
+| `src/state/desk.ts` | **the reducer** — events to desk state, and the precedence rules |
+| `src/state/seed.ts` | seed the floor from a REST snapshot |
+| `src/state/registry.ts` | the desk `Map`, tombstones, parent/child links |
+| `src/replay/{parse,play,replay}.ts` | replay a recording; `play.ts` is the browser-safe one |
+| `src/room/{layout,room}.ts` | pure geometry, then canvas drawing |
+| `src/app/floor.ts` | `createFloor` — the object the page owns |
+| `src/main.ts`, `index.html` | the page |
+| `src/dev/service-route.ts`, `vite.config.ts` | the dev-only `GET /__service` credential route |
 
 ## Conventions — how work is done here
 
-- **One task at a time, in plan order.** Each task is test-first: write the failing
-  test, run it, see it fail, then implement.
-- **`bun run test` and `bun run typecheck` must both pass before every commit.**
-  This is not optional; `typecheck` is the only thing that catches interface drift
-  between tasks.
+- **One task at a time, in plan order**, test-first: failing test, run it, see it fail,
+  then implement.
+- **`bun run test` and `bun run typecheck` must both pass before every commit.** This is
+  the single most valuable rule in this repo's history — see below.
+- **Run the thing.** Three real bugs on this branch were invisible to unit tests and to
+  typecheck; two were only found by starting the dev server.
 - **OpenCode is never modified.** This is a client. No patches, no forks, no plugins.
-- **No Node-only globals in `src/`.** The shell is an ordinary browser app (Vite,
-  fetch-streaming, no Electron), so `Buffer`, `process`, `require`, `__dirname` and
-  `node:` imports are banned in `src/`. `node:` imports are expected in `tests/`.
+- **No `Buffer`, `process`, `require`, `__dirname` or `node:` imports in `src/`** — it
+  ships to a browser. `node:` in `tests/` is expected. One plan-mandated type-only
+  exception exists in `src/dev/service-route.ts`.
 - **The service password is read at runtime from
-  `~/.local/state/opencode/service.json`, and is never committed, logged, printed or
-  sent anywhere.** There is no copy of it in this repo. Keep it that way.
-- **No file over ~400 lines.** No mock state in any shipped code path.
-- **Recordings are sensitive** — they contain prompts, paths and command output.
-  Raw recordings go in `fixtures/raw/` and are git-ignored; anything committed to
-  `fixtures/` must be scrubbed first.
-- MIT-compatible dependencies only. Package manager is `bun`.
+  `~/.local/state/opencode/service.json` and is never committed, logged, printed or sent
+  anywhere.** No copy of it is in this repo.
+- **Recordings are sensitive** — prompts, paths, command output. `fixtures/raw/` is
+  git-ignored; only scrubbed fixtures get committed.
+- No file over ~400 lines. No mock state in any shipped path. MIT-compatible deps, `bun`.
 
-## State: 4 of 12 tasks complete
+## Three bugs worth remembering
 
-All four were reviewed by an independent agent and are clean.
+1. **The stale field name.** The parallel branches were split at a frozen interface;
+   after a field was renamed on one side, the other side's new function still read the
+   old name. 127 tests passed. **`tsc` caught it.** That is what the typecheck rule is for.
+2. **The unmounted route.** The dev credential route was registered under a config key
+   that Vite does not have, so it never mounted and the page could never connect. Every
+   unit test passed, because the handler was tested against a raw `node:http` server.
+   **Only starting the dev server showed it.** It was also invisible to typecheck because
+   `vite.config.ts` was not in the tsconfig `include` — now it is.
+3. **The wrapped payloads.** The page assumed bare arrays from `/api/session`,
+   `/api/permission/request` and `/api/form`. They actually return `{ data: [...] }`.
+   Found in the same run that fixed 2.
 
-| # | Task | Status |
-|---|---|---|
-| 1 | Project scaffold; read the OpenCode service file | ✅ complete |
-| 2 | One authed API client every call goes through | ✅ complete |
-| 3 | SSE frame parser, survives chunk splits | ✅ complete |
-| 4 | Live stream reader (`fetch` + stream reader) | ✅ complete |
-| 5 | **Record a stream to disk** — the slice-1 deliverable | next |
-| 6 | **Frames → desk state** — the reducer; the centre of gravity | |
-| 7 | Seed the floor from a REST snapshot | |
-| 8 | The desk registry | |
-| 9 | Replay a recording through the same reducer | |
-| 10 | Desk layout (pure geometry) | |
-| 11 | Draw the room (canvas, rectangles — no art) | |
-| 12 | Wire it together: the page and a dev-only credential route | |
+## Rulings someone must own
 
-**Start at Task 5.** Generate its brief and dispatch it.
+Twenty-two were made; every one is in the ledger with its cost. The ones that still
+shape the code:
 
-### Two things Tasks 5 and 12 need
+- **A desk tracks every open permission request** (`openPermissions: string[]`), not just
+  the first — the platform can hold several and surface them one at a time.
+- **The terminal-state settle belongs to the caller, not the reducer.** The reducer holds
+  `success`/`failure` and has no timers; `settleDesk` is pure and the page runs the hold.
+  A reducer-only test suite cannot detect its absence, because the bug is silence.
+- **"Waiting on another worker" means a parent whose child session is busy** — not
+  `session.inbox.*`, which every prompt passes through.
+- **The room's rect carries the status colour**; there is no dot or badge.
+- **`draw` deliberately has no unit test** — a mocked 2D context verifies the mock, not
+  the picture.
+- **The narrative owns the primary data model and the floor is one of its renderers**:
+  a *scene* is `{ id, location, cast, beats }`, a *beat* is `{ id, at, eventIDs, kind, line }`.
+- **Sequence: script, then floor, then staged animation.** Animation is where this dies
+  if it starts there.
 
-- **Task 5** verifies itself by running the recorder against a live
-  `opencode serve` while you do real work — in the OpenCode desktop app, since
-  session *creation* is deliberately out of scope. The endpoint the spec lists for
-  prompting (`POST /api/session/{id}/prompt`) needs an existing session id; whether
-  a session-creation endpoint exists has never been verified. That matters for
-  slice 4, not this plan.
-- **Task 12** owns a dev-only `GET /__service` route in `vite.config.ts`. The browser
-  cannot read the service file, so this route serves `{url, password}` from the Vite
-  process to the page. The plan has been amended for this. Do not let the floor own
-  the page layout: keep it a panel in a shell, because the script becomes the primary
-  surface beside it.
+## What is deferred, and what was never verified
 
-## Rulings made — someone must own these
+Deferred minors were triaged by the final review as **all shippable**. The two that
+matter when they next come up:
 
-Every decision taken on the owner's behalf, in order. If one is wrong, it is wrong
-here, visibly.
+- **`setSnapshot` discards the registry's tombstones and parent links.** Dormant today
+  because it runs once before any live frame. It becomes a real bug the moment the spec's
+  re-snapshot-on-reconnect is wired, and **must be fixed in that same change.**
+- **`?? []` on the seed unwrap silently swallows a shape regression** — the room would
+  seed zero desks while still reading "live". An `Array.isArray` guard would make it loud.
 
-1. **Branch, not a git worktree.** The repo was minutes old, single-author, docs
-   only, no concurrent work to isolate from.
-2. **Every task runs `bun run test` and `bun run typecheck` before committing.** The
-   plan ran neither.
-3. **Task 1's password-leak test was vacuous and the plan mandated it** — the
-   `expect` sat inside the `catch`, so it passed when nothing was thrown. Tightened
-   so it fails when `readService` does not throw.
-4. **Added `@types/node` and a `typecheck` script.** The plan's devDeps list was
-   incomplete, so `tsc` failed with six `TS2591` errors and nothing ran type
-   checking at all.
-5. **`setSnapshot` replaces the desk set rather than merging.** The snapshot is
-   authoritative for which sessions exist, so a session deleted while disconnected
-   disappears and a permission raised during the gap shows.
-6. **`permission.replied` with no matching open request is a no-op; with a match it
-   clears the permission and moves the desk to `working`.** The plan's tests demanded
-   both while its prose named neither.
-7. **`waitingOnSibling` persists across unrelated events**, so clearing a permission
-   returns the desk to its sibling wait rather than `idle`.
-8. **Corrected four Tasks' "Consumes" claims and one test count in the plan itself.**
-   Documentation defects: Task 10 claimed to consume `Desk` when `layout` takes a
-   count, Task 11 did not say it calls `layout(desks.length, …)`, Task 12 named none
-   of its inputs, and Task 6's test count was wrong.
-9. **Task 9's fixture must leave `sess-gamma` created and never started.** A deleted
-   session would not appear in the final state at all, making the assertion
-   impossible as written.
-10. **The browser cannot read `~/.local/state/opencode/service.json`.** The spec's
-    "no proxy process" rule was about auth headers, not filesystem access, so it did
-    not settle this. Resolution: a dev-only route inside the Vite process. Cost if
-    wrong: the foundation works only in dev and a shippable build needs a real
-    credential path — one file.
-11. **Amended Task 12** for the above, which as written had the page calling a
-    Node-only module.
-12. **The narrative owns the primary data model; the floor is one of its renderers.**
-    A *scene* is `{ id, location, cast, beats }`; a *beat* is
-    `{ id, at, eventIDs, kind, line }`. Three renderings fall out of that: script
-    (beats in order), floor (cast at desks — what Task 12 builds), staged animation.
-    Had the narration been merely "lines attached to events", the visuals could not
-    be generated from it and the surfaces would drift apart.
-13. **Sequence: script, then floor, then staged animation.** Animation is where this
-    project dies if it starts there.
-14. **The "takes" idea is superseded by the narrative layer.** It is a subset — an
-    attempt count from `session.retry.scheduled` and repeated `execution.started`.
-    Do not build it separately.
+Never verified by anyone: **browser rendering and live SSE.** Everything green here is
+green against recordings and a `curl`, not against pixels. Run `bun run dev` with
+`opencode serve` and watch a desk appear — that is the cheapest way to retire it.
 
-## The narrative layer — why this project exists
+## Next
 
-This is the owner's actual goal, and it is **not in this plan**. It needs its own
-spec once the foundation lands.
+**The narrative layer, and it needs a plan.** Its design is written and reviewed
+(revision 3). Its own suggested first slice is: re-record with the frame fields the
+narrative needs, then the pure `rollup` with golden tests, then template lines rendered
+as a script beside the floor — the Director, jokes and all, comes last on purpose,
+because a joke on top of an uncited line is the one failure that design cannot recover
+from.
 
-A funny, followable story of the real work, written as scenes. The owner watches it
-**live**, as the work happens, and eventually wants **visuals of an actual AI
-sitcom**, at which point the floor stops being a parallel view and becomes the
-*staging* of the narrative.
+Two of its preconditions are already met: `Frame` now keeps `created` and `location`,
+and the room reads only `status`, so the narrative can be added without disturbing it.
 
-- **Two voices.** Each worker writes a line about what it just did — grounded by
-  construction, and only possible when a unit of work ends. A **Director** stitches
-  those plus the event stream into sitcom beats: cold open, A-plot, B-plot, tag.
-- **Live means a selection problem.** A real event stream is almost all noise. So
-  the pipeline needs a **pure rollup layer** that collapses raw events into beats
-  worth narrating — a tool started and finished is one beat, two hundred deltas are
-  one beat, a failure is an immediate beat, a long silence is a beat. The Director
-  turns beats into lines. This is also the cost control: spend scales with beats,
-  not events.
-- **The non-negotiable.** Every narrative line carries the id of the event it
-  describes. The narration frames and never invents. A line with no underlying event
-  cannot exist, because a voiceover that misreports the work is worse than no
-  voiceover.
-- **Runtime consequence.** It runs as long as the human works, so a free tier will
-  rate-limit mid-session. It needs a cheap paid model and a kill switch; losing the
-  narrator must not stop the work.
+**One investigation does need doing before the rollup's rules are final:** §4.1 flags
+that `tool-fails` probably misses real failures, because a non-zero shell exit may
+arrive as a `tool.success`. Record a deliberate failure of each tool and settle it.
 
-## Open issues, deferred minors, and unverified things
-
-Deferred minors were deliberately kept out of the fix loops; the final whole-branch
-review should triage which matter before merge.
-
-- `src/api/sse.ts` splits only on `\n\n`, so a **CRLF-terminated stream parses zero
-  frames** and `rest` grows without bound — a hang, not a crash. Plan-mandated;
-  OpenCode emits LF.
-- A heartbeat sent as `:ping\n` (single newline) has the same unbounded-`rest`
-  failure mode.
-- `src/api/stream.ts`'s final `parseFrames` call is a **provable no-op** — `rest`
-  can never itself contain `\n\n` — and its comment overstates what it does.
-- No `finally { reader.cancel() }` in `streamFrames`, so a throwing `onFrame` leaves
-  the HTTP response open. It is called in a reconnect loop.
-- The stream tests' server `close()` is not awaited, so a failed assertion leaks the
-  listener.
-- The **null-body branch of `streamFrames` is untested**, deliberately: it is
-  near-unreachable from a real server, and a contrived mock was judged worse than a
-  documented gap.
-- The non-ASCII byte-identity property in `src/api/client.ts` (the reason its base64
-  was rewritten from `Buffer` to `btoa`) has **no committed test** — the evidence was
-  an ad-hoc run. This one is worth fixing first.
-- `tests/api/client.test.ts` closes its HTTP listener after the assertions, so a
-  failing assertion leaks it.
-- `base + path` in `src/api/client.ts` builds a malformed URL if a path lacks a
-  leading slash.
-- A caller-supplied `Authorization` header is silently overwritten. Intended.
-- **`fixtures/sample.jsonl`** (Task 9) does not exist yet and is hand-written: no real
-  paths, prompts or ids, and it must produce exactly the three final desk states the
-  plan asserts.
-- **Unverified:** whether `packages/simulation` in the OpenCode repo is a usable
-  event-fixture harness (Task 9 checks, and prefers it over a hand-written sample);
-  whether the endpoint list in spec §6.2 is complete; whether a session-creation
-  endpoint exists at all.
-
-## The OpenCode facts you need
-
-- Server: `opencode serve` — "the v2 API and web server". 118 REST endpoints, full
-  OpenAPI at `GET /openapi.json`.
-- Auth: HTTP Basic, `opencode:<password>`, password in
-  `~/.local/state/opencode/service.json`.
-- Events: `GET /api/event`, SSE. Frames are
-  `data: {"id":"evt_…","type":"<name>","location":{…},"data":{…}}` with `: heartbeat`
-  comments between them.
-- Loophole that makes the browser shell viable: the server returns
-  `Access-Control-Allow-Origin` for `localhost`/`127.0.0.1` on any port, and its
-  preflight answers `204` allowing the `authorization` header. So a page served from
-  a local dev server can call the API directly. Use `fetch`-streaming, **not**
-  `EventSource`, which cannot send the header.
-- The event-to-desk-state mapping, including the precedence and clearing rules, is
-  spec §6.3. It is the whole room, and it is the part most likely to change.
+**Owner decisions still open** (§12 of the narrative design): the tone; whether an
+episode is a chat or a project; who the Human is; where model calls run and with what
+key and budget; how series are stored; and whether there are seasons, and where the
+script lives once the floor becomes the stage.
 
 ## If you are a different harness
 
-Nothing here is OpenCode-specific. It is a TypeScript/Vite project with a
-test-first plan, and any agent that can read a markdown plan, run `bun run test` and
-`bun run typecheck`, and write a failing test before an implementation can carry on.
-The plan is written to be executed task-by-task by an agent that has not seen this
-project.
+Nothing here is OpenCode-specific. It is a TypeScript/Vite project with test-first plans
+written to be executed task-by-task by an agent that has not seen the project. Any agent
+that can read a markdown plan, run two commands, and write a failing test before an
+implementation can carry this on.
 
-To make these conventions load automatically, copy the **Conventions** and
-**Rulings** sections into `AGENTS.md` (OpenCode) or `CLAUDE.md` (Claude Code).
+To make these conventions load automatically, copy **Conventions** and **Three bugs worth
+remembering** into `AGENTS.md` (OpenCode) or `CLAUDE.md` (Claude Code).

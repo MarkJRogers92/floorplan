@@ -887,12 +887,14 @@ Expected: FAIL — cannot resolve `../../src/room/room`
 
 - [ ] **Step 3: Implement `statusColour` and `createRoom`**
 
-A flat map from status to a hex string. `createRoom` holds the canvas and its 2D context; `draw(desks)` clears, runs `layout`, and fills one rounded rect per desk plus a small status dot. **No text, no sprites, no font** — art is deliberately absent. Desks past the last visible row are not drawn.
+A flat map from status to a hex string. `createRoom` holds the canvas and its 2D context; `draw(desks)` clears, runs `layout`, and fills one rounded rect per desk **with that desk's status colour** — the colour *is* the status carrier, so there is no separate dot, badge or glyph. **No text, no sprites, no font** — art is deliberately absent. Desks past the last visible row are not drawn.
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `bun run test tests/room/room.test.ts`
 Expected: PASS, 3 tests
+
+**Note:** `draw` itself has no unit test, deliberately. Rendering it would mean a mocked 2D context, which verifies the mock rather than the picture. It is verified by eye in Task 12 Step 5, which is the right test for a visual surface.
 
 - [ ] **Step 5: Commit**
 

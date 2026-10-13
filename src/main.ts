@@ -81,12 +81,19 @@ async function startLive(service: Service) {
   }
 }
 
-async function start() {
-  const service = await fetchService()
-  if (!service) return
-
+async function connect(service: Service) {
   await seedFromREST(service)
   startLive(service)
+}
+
+async function start() {
+  try {
+    const service = await fetchService()
+    if (!service) return
+    await connect(service)
+  } catch (err) {
+    setStatus((err as Error).message, true)
+  }
 }
 
 replayBtn.addEventListener('click', () => {
@@ -122,3 +129,11 @@ function resize() {
 window.addEventListener('resize', resize)
 resize()
 start()
+
+// Keep the canvas in sync with state changes that no frame announces, such as the
+// success/failure hold falling back to idle after a timer.
+function loop() {
+  draw()
+  requestAnimationFrame(loop)
+}
+requestAnimationFrame(loop)

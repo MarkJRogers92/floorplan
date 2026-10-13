@@ -48,6 +48,10 @@ export function createFloor(): {
   return {
     setSnapshot(sessions, permissions) {
       const seeded = seedDesks(sessions, permissions)
+      // shortcut: this builds a fresh Map, so deleted-session tombstones from the
+      // previous registry are discarded. The snapshot is authoritative for which
+      // sessions exist; a straggler for a dropped session after a reconnect can be
+      // ignored because the snapshot already caught us up.
       const next = new Map<string, Desk>()
       // Preserve the order of desks that already exist, but take their seeded state
       // so a newly raised permission (or cleared one) is reflected.

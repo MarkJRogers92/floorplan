@@ -106,7 +106,7 @@ on every reconnect, as the floor does (spec §6.3).
 | `says` | `text.started` (or first `text.delta`) | closed by `text.ended`; carries the delta count and the ended frame's id |
 | `uses-tool` | `tool.success`, any tool but `subagent` (a nameless success carrying `metadata.sessionID` is a `guest-leaves`) | joins `input.started` (name) → `called` → `progress`* by call `id`; name `unknown` if joined mid-call; shell exit code joined via `progress.metadata.shellID` → `shell.exited.id` |
 | `tool-fails` | `tool.failed` | as above; **immediate** |
-| `guest-arrives` | `session.created` with `parentID` | linked to a call only by the call's `input.sessionID` or its success's `metadata.sessionID` — never by "the parent's open call" |
+| `guest-arrives` | `session.created` carrying a `parentID` | linked to a call **only** by that call's `input.sessionID`, and only when that frame preceded the arrival; never by "the parent's open call", and not from the success's `metadata.sessionID`, which arrives after the beat is emitted and beats are immutable |
 | `guest-leaves` | `tool.success` of a `subagent` call | **instead of** `uses-tool`, never as well; the child is `metadata.sessionID`. One per call, so a returning guest leaves twice and arrives once |
 | `knocks` | `permission.asked`, `form.created` | **immediate** |
 | `answered` | `permission.replied` (`once` / `always` / `reject`), `form.replied`, `form.cancelled` | — |

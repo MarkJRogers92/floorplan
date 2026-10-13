@@ -78,6 +78,8 @@ built; they were deferred and are the remaining part of the spec's "done means".
 | `server/series-store.ts`, `src/dev/series-route.ts`, `http-guard.ts` | private atomic local files and guarded loopback archive/context routes |
 | `src/app/series-client.ts` | nonblocking live milestone saves, read-through context and visible storage status; no replay saves |
 | `src/app/cast-memory.ts` | validated displayed-context projection and current-cast memory cards; no fabricated identities or recap lines |
+| `src/narrative/recap.ts`, `src/app/recap-client.ts`, `script-view.ts` | bounded earlier-footage proof montage, reset-safe local reads and text-safe script/memory/recap DOM |
+| `src/room/stage.ts`, `assets/worker.*` | reception-clock reaction cues and layered, hand-authored five-pose monitor-clerk sheet |
 | `src/room/{layout,room}.ts` | pure geometry, then canvas drawing |
 | `src/app/floor.ts` | `createFloor` — the object the page owns |
 | `src/main.ts`, `index.html` | the page — script primary column, floor panel beside it |

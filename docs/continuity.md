@@ -62,7 +62,24 @@ When opted in, a bounded previous-episode summary and saved personas for this sc
 agents may be sent to the existing fixed model. No extra model call is added, no raw
 old frames/quotes are sent, and the same spending/disable/opt-out checks apply.
 Historical statistics guide fictional motives, not factual claims: full-history
-ordinal/absence/cost slots and “Previously on…” are not implemented yet.
+ordinal/absence/cost slots are not implemented.
+
+**Previously on…** is a local template-only montage: at most three proved moments
+from two earlier archived chats in the same project, always labelled “may be incomplete.”
+The current chat is excluded, including earlier saves of a resumed chat. Unknown,
+inverted or non-earlier timestamps are omitted rather than guessed. Each line is
+recomputed in the browser from its paired episode/beat reference; no historical footage
+enters current scene evidence, stage reactions or Director requests. Unknown scope,
+metadata-only chats and replays do not read recaps. A failed read shows a small notice
+without stopping the script; unchanged failed reads wait for a scope/cutoff change or
+reload, not an automatic retry loop.
+
+The floor now shows a shared, hand-authored monitor-clerk with five static poses.
+Current live/replay beats cue short, explicitly dramatised reactions; colours still
+show real desk state. Historical recaps never move the actors. Reduced-motion preference
+removes positional motion, missing images retain usable desk rectangles, and expired
+cues return to idle. This is first-pass staging, not a completed animated office or
+individual character designs. Editable source and named pose slices are in `assets/`.
 
 Director opt-in still applies to replay narration. A fresh replay scene may reserve
 the same3¢ as live footage, within the existing caps; “not saved” does **not** mean free.

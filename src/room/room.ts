@@ -1,5 +1,6 @@
 import type { Desk, DeskStatus } from '../state/desk'
-import { layout } from './layout'
+import { layout, type Rect } from './layout'
+import type { StageFrame, StagePose } from './stage'
 
 // Each status gets its own hue. waiting-on-you (amber) and waiting-on-worker (violet)
 // must never look alike: "needs you" and "blocked on a sibling" are different situations.
@@ -18,13 +19,23 @@ export function statusColour(status: DeskStatus): string {
   return COLOURS[status]
 }
 
-// Draws desks as coloured rectangles. No text, no sprites: art is deliberately absent.
-export function createRoom(canvas: HTMLCanvasElement): { draw(desks: Desk[]): void } {
+export function reactionRect(rect: Rect, frame?: StageFrame): Rect {
+  const offset = (value?: number) => Number.isFinite(value) ? Math.round(Math.max(-3, Math.min(3, value!))) : 0
+  return { x: rect.x + 4 + offset(frame?.dx), y: rect.y + 4 + offset(frame?.dy), w: rect.w - 8, h: rect.h - 8 }
+}
+const POSE_FRAME: Record<StagePose, number> = {
+  idle: 0, think: 1, speak: 2, work: 3, recoil: 4, alert: 2, arrive: 0, leave: 0, wrap: 0, cut: 4, forget: 1, retry: 3,
+}
+
+// Status stays factual; the worker pose is an explicitly dramatised reaction to footage.
+export function createRoom(canvas: HTMLCanvasElement, worker?: HTMLImageElement): {
+  draw(desks: Desk[], frames?: ReadonlyMap<string, StageFrame>): void
+} {
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('2D canvas context unavailable')
 
   return {
-    draw(desks: Desk[]) {
+    draw(desks: Desk[], frames?: ReadonlyMap<string, StageFrame>) {
       const bounds = { w: canvas.width, h: canvas.height }
       ctx.clearRect(0, 0, bounds.w, bounds.h)
       const rects = layout(desks.length, bounds)
@@ -36,6 +47,16 @@ export function createRoom(canvas: HTMLCanvasElement): { draw(desks: Desk[]): vo
         ctx.beginPath()
         ctx.roundRect(r.x, r.y, r.w, r.h, RADIUS)
         ctx.fill()
+        const cue = frames?.get(desk.sessionID)
+        const actor = reactionRect(r, cue)
+        if (worker?.complete && worker.naturalWidth === 80 && worker.naturalHeight === 20) {
+          ctx.imageSmoothingEnabled = false
+          const pose = cue ? POSE_FRAME[cue.pose] : 0
+          ctx.drawImage(worker, pose * 16, 0, 16, 20, actor.x + 4, actor.y, 32, 40)
+        } else if (cue) {
+          ctx.strokeStyle = '#e5e7eb'
+          ctx.strokeRect(actor.x, actor.y, actor.w, actor.h)
+        }
       })
     },
   }

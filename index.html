@@ -62,6 +62,10 @@
       .cast-memory > div { margin-top: 8px; }
       .cast-memory p { margin: 3px 0; overflow-wrap: anywhere; }
       .cast-memory small { overflow-wrap: anywhere; }
+      .recap { margin: 10px 0; padding: 8px 10px; border-left: 2px solid #a5b4fc; background: #182032; }
+      .recap h3 { margin: 0 0 4px; font-size: 14px; }
+      .recap-note { font-size: 12px; color: #9ca3af; }
+      .recap .line { overflow-wrap: anywhere; }
       #script section[data-narration="director"] > .scene::after {
         content: ' · Director — checked';
         color: #a5b4fc;
@@ -127,12 +131,17 @@
         flex: 2 1 0;
         min-width: 240px;
         position: relative;
+        display: flex;
+        flex-direction: column;
       }
+      #room { flex: 1 1 auto; min-height: 0; position: relative; }
+      #stage-cue { flex: 0 0 48px; box-sizing: border-box; overflow: auto; padding: 6px 10px; font-size: 12px; color: #9ca3af; overflow-wrap: anywhere; }
       #floor canvas {
         position: absolute;
         inset: 0;
         width: 100%;
         height: 100%;
+        image-rendering: pixelated;
       }
     </style>
   </head>
@@ -150,7 +159,7 @@
       </div>
       <div id="stage">
         <div id="script" role="region" aria-label="Episode script"></div>
-        <div id="floor"><canvas id="canvas"></canvas></div>
+        <div id="floor"><div id="room"><canvas id="canvas"></canvas></div><div id="stage-cue" tabindex="0">Dramatised reactions; desk colours show real states.</div></div>
       </div>
     </div>
     <script type="module" src="/src/main.ts"></script>

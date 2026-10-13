@@ -4,6 +4,7 @@ import { SeriesStoreError } from '../../server/series-store'
 import { parseArchivedEpisode, MAX_EPISODE_BYTES } from '../narrative/series'
 import { isID } from '../narrative/evidence'
 import { validSeriesKey } from '../narrative/scope'
+import { buildRecap } from '../narrative/recap'
 import { assertLocal, readJSONBody, sendJSON, HTTPError } from './http-guard'
 
 export function createSeriesHandler(store: ReturnType<typeof createSeriesStore>) {
@@ -11,7 +12,18 @@ export function createSeriesHandler(store: ReturnType<typeof createSeriesStore>)
     try {
       assertLocal(req)
       const url = new URL(req.url ?? '', 'http://127.0.0.1')
-      if (!['/context', '/episode'].includes(url.pathname)) throw new HTTPError(404, 'not found')
+      if (!['/context', '/episode', '/recap'].includes(url.pathname)) throw new HTTPError(404, 'not found')
+      if (url.pathname === '/recap') {
+        if (req.method !== 'GET') throw new HTTPError(405, 'method not allowed')
+        const key = url.searchParams.get('key')
+        const root = url.searchParams.get('root')
+        const raw = url.searchParams.get('before')
+        const before = Number(raw)
+        if (!validSeriesKey(key) || !isID(root) || !raw || !Number.isFinite(before) || before <= 0 || before > Number.MAX_SAFE_INTEGER) {
+          throw new HTTPError(400, 'invalid request')
+        }
+        return sendJSON(res, 200, buildRecap(await store.load(key), root, before))
+      }
       if (url.pathname === '/context') {
         if (req.method !== 'GET') throw new HTTPError(405, 'method not allowed')
         const key = url.searchParams.get('key')

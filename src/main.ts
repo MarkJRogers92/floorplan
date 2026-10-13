@@ -5,18 +5,20 @@ import { streamFrames } from './api/stream'
 import { createFloor } from './app/floor'
 import { directorCall, parseDirectorState } from './app/director-client'
 import { createSeriesClient } from './app/series-client'
+import { createRecapClient } from './app/recap-client'
+import { scriptRow, memoryElement, recapElement } from './app/script-view'
 import { castMemoryCards } from './app/cast-memory'
 import { scopeFromSnapshot, seriesKeyForRoot } from './narrative/scope'
 import { rootFor } from './narrative/cast'
 import type { DirectorState } from './narrative/director'
 import { createDirectorRuntime } from './narrative/director-runtime'
 import { createRollup, flush as flushRollup, rollup as rollFrame, seedRollup } from './narrative/rollup'
-import type { ScriptLine } from './narrative/script'
 import type { Beat } from './narrative/types'
 import { assembleEpisodeViews } from './narrative/views'
 import { parseRecording } from './replay/parse'
 import { replayFrames } from './replay/play'
 import { createRoom } from './room/room'
+import { createStageRuntime } from './room/stage'
 
 const toolbar = document.getElementById('toolbar')!
 const status = document.getElementById('status')!
@@ -27,13 +29,31 @@ const scriptEl = document.getElementById('script')!
 const directorBtn = document.getElementById('director') as HTMLButtonElement
 const directorStatus = document.getElementById('director-status')!
 const historyStatus = document.getElementById('history-status')!
+const stageCue = document.getElementById('stage-cue')!
 
 const floor = createFloor()
-const room = createRoom(canvas)
+const workerImage = new Image()
+workerImage.src = new URL('../assets/worker.png', import.meta.url).href
+const room = createRoom(canvas, workerImage)
+const stage = createStageRuntime()
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+let lastStageBeat: Beat | undefined
 let liveAbort: AbortController | null = null
 
 function draw() {
-  room.draw(floor.desks())
+  const desks = floor.desks()
+  const frames = stage.frames(performance.now(), reducedMotion.matches)
+  room.draw(desks, frames)
+  const actor = lastStageBeat && 'childSessionID' in lastStageBeat.detail ? lastStageBeat.detail.childSessionID : lastStageBeat?.sessionID
+  const frame = actor ? frames.get(actor) : undefined
+  const visible = frame && desks.some(d => d.sessionID === frame.sessionID) && frame.beatID === lastStageBeat?.id
+  const label = visible ? `${frame.kind} — dramatised reaction · ${frame.beatID}` : 'Dramatised reactions; desk colours show real states.'
+  const session = visible ? frame.sessionID : ''
+  if (stageCue.textContent !== label || stageCue.dataset.session !== session) {
+    stageCue.textContent = label
+    stageCue.dataset.beat = visible ? frame.beatID : ''
+    stageCue.dataset.session = session
+  }
 }
 
 function setStatus(text: string, isError = false) {
@@ -60,6 +80,7 @@ const history = createSeriesClient(fetch, () => {
   historyStatus.textContent = history.status()
   renderNarrative()
 })
+const recaps = createRecapClient(fetch, () => { renderNarrative() })
 const director = createDirectorRuntime((request, signal) => directorCall('scene', request, signal), () => {
   renderNarrative()
   void refreshDirectorState()
@@ -128,36 +149,23 @@ function chatOptOut(root: string) {
 function resetNarrative() {
   director.reset()
   history.reset()
+  recaps.reset()
+  stage.reset(); lastStageBeat = undefined
   rollState = seedRollup(createRollup(), { sessions: [], permissions: [] })
   beats = []
   narrativeFlushed = false
   scriptEl.replaceChildren()
 }
 
-function scriptRow(line: ScriptLine, kind: 'episode' | 'scene' | 'line') {
-  const row = document.createElement('div')
-  row.className = kind
-  row.dataset.beats = line.beatIDs.join(' ')
-  row.tabIndex = 0
-  if (kind === 'line') {
-    row.dataset.delivery = line.delivery
-    if (line.line.flashback) row.dataset.flashback = 'true'
-  }
-  const text = document.createElement('span')
-  text.textContent = line.text
-  const ids = document.createElement('span')
-  ids.className = 'beats'
-  ids.textContent = line.beatIDs.join(' ')
-  row.append(text, ids)
-  return row
-}
-
 /** Rebuild the pure episode view so newly learned cast names and scene cuts stay current. */
 function narrate(arrived: Beat[], flushed = false) {
   beats.push(...arrived)
+  stage.update(arrived, performance.now())
+  if (arrived.length) lastStageBeat = arrived[arrived.length - 1]
   if (flushed) narrativeFlushed = true
   history.update(beats, [...rollState.sessions.values()], replaying)
   historyStatus.textContent = history.status()
+  recaps.update(beats, [...rollState.sessions.values()], replaying)
   director.update(beats, [...rollState.sessions.values()], narrativeFlushed, !replaying)
   renderNarrative()
 }
@@ -175,36 +183,22 @@ function renderNarrative() {
     episode.append(chatOptOut(view.episode.rootSessionID))
     const root = view.episode.rootSessionID
     const key = seriesKeyForRoot(root, sessions)
+    if (!replaying && key) {
+      const recap = recaps.recapFor(key, root)
+      const rendered = recap ? recapElement(recap) : undefined
+      if (rendered) episode.append(rendered)
+      else if (recaps.errorFor(key, root)) {
+        const notice = document.createElement('p')
+        notice.className = 'recap-note'
+        notice.textContent = 'Earlier footage unavailable — the live script continues.'
+        episode.append(notice)
+      }
+    }
     const agents = sessions.filter(s => rootFor(s.id, index) === root).flatMap(s => s.agent ? [s.agent] : [])
     const cards = !replaying && key ? castMemoryCards(history.contextFor(key, root), agents) : []
     if (cards.length) {
-      const memory = document.createElement('details')
-      memory.className = 'cast-memory'
-      memory.dataset.memory = JSON.stringify([key, root])
-      memory.open = openMemory.has(memory.dataset.memory)
-      const summary = document.createElement('summary')
-      summary.textContent = 'Cast memory'
-      memory.append(summary)
-      for (const card of cards) {
-        const entry = document.createElement('div')
-        const name = document.createElement('strong')
-        name.textContent = card.agent
-        entry.append(name)
-        if (card.persona) {
-          const fiction = document.createElement('p')
-          fiction.textContent = `Invented persona: ${card.persona.text}`
-          const proof = document.createElement('small')
-          proof.textContent = `Stored debut: ${card.persona.debut.episodeID} · ${card.persona.debut.beatID}`
-          entry.append(fiction, proof)
-        }
-        if (card.episodes.length) {
-          const appearances = document.createElement('p')
-          appearances.textContent = `Previous appearances: ${card.episodes.join(', ')}`
-          entry.append(appearances)
-        }
-        memory.append(entry)
-      }
-      episode.append(memory)
+      const id = JSON.stringify([key, root])
+      episode.append(memoryElement(cards, id, openMemory.has(id)))
     }
     for (const group of view.scenes) {
       const scene = document.createElement('section')

@@ -494,12 +494,12 @@ Expected: FAIL — cannot resolve `../../src/state/desk`
 
 - [ ] **Step 3: Implement `createDesk` and `applyFrame`**
 
-Fall back to `caption` from the event type's verb when the spec names none (e.g. the tool name or `"compacting"`). Order the rules so an open `openPermission` short-circuits everything except `permission.replied`. Treat `success`/`failure` as holdable states: `succeeded`/`failed`/`interrupted` set them, and the *next* frame drives the change, so no timers live in this module. `session.execution.interrupted` behaves as `failure`. Return a new object always.
+Fall back to `caption` from the event type's verb when the spec names none (e.g. the tool name or `"compacting"`). Order the rules so an open `openPermission` short-circuits everything except `permission.replied`. `permission.replied` with a matching open request clears `openPermission` and moves the desk to `working`; a reply that matches nothing is a no-op, and the tests pin both. `waitingOnSibling` is a flag that persists across other events: `session.inbox.*` sets it, and the status it implies shows whenever no permission is open. Treat `success`/`failure` as holdable states: `succeeded`/`failed`/`interrupted` set them, and the *next* frame drives the change, so no timers live in this module. `session.execution.interrupted` behaves as `failure`. Return a new object always.
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `bun run test tests/state/desk.test.ts`
-Expected: PASS, 16 tests
+Expected: PASS, 15 tests
 
 - [ ] **Step 5: Commit**
 
@@ -749,7 +749,7 @@ Expected: FAIL — cannot resolve `../../src/replay/replay`
 
 **Before writing the fixture, check `packages/simulation`** (spec §6.5). If it already emits frames in this shape, prefer it over a hand-written sample and say so in the commit message — a real generated stream is worth more than one I invent.
 
-`fixtures/sample.jsonl` is hand-written and scrubbed: no real paths, prompts or ids. It must produce exactly the three final states asserted above — `sess-alpha` left `working`, `sess-beta` holding an unanswered `permission.asked`, `sess-gamma` created and deleted or never started. Include at least one frame type the reducer does not know, so replay exercises the no-op path.
+`fixtures/sample.jsonl` is hand-written and scrubbed: no real paths, prompts or ids. It must produce exactly the three final states asserted above — `sess-alpha` left `working`, `sess-beta` holding an unanswered `permission.asked`, `sess-gamma` created and never started, so it stays `idle` *and* still present (a deleted session would not appear at all). Include at least one frame type the reducer does not know, so replay exercises the no-op path.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -771,7 +771,7 @@ git add -A && git commit -m "feat: replay a recorded stream through the same red
 - Test: `tests/room/layout.test.ts`
 
 **Interfaces:**
-- Consumes: `Desk` (Task 6)
+- Consumes: nothing — pure geometry, it never sees a desk.
 - Produces: `type Rect = { x: number; y: number; w: number; h: number }`; `layout(count: number, bounds: { w: number; h: number }, cell?: number): Rect[]`
 
 - [ ] **Step 1: Write the failing test**
@@ -845,7 +845,7 @@ git add -A && git commit -m "feat: compute desk positions on a grid"
 - Test: `tests/room/room.test.ts`
 
 **Interfaces:**
-- Consumes: `Desk` (Task 6), `Rect`, `layout` (Task 10)
+- Consumes: `Desk`, `DeskStatus` (Task 6); `Rect` and `layout` (Task 10) — `draw` calls `layout(desks.length, bounds)`
 - Produces: `statusColour(status: DeskStatus): string`; `createRoom(canvas: HTMLCanvasElement): { draw(desks: Desk[]): void }`
 
 - [ ] **Step 1: Write the failing test**
@@ -901,7 +901,7 @@ git add -A && git commit -m "feat: draw desks as coloured rectangles"
 - Test: `tests/app/floor.test.ts`
 
 **Interfaces:**
-- Consumes: everything above
+- Consumes: `readService` (Task 1); `streamFrames` (Task 4); `Frame` (Task 3); `SessionSnapshot`, `PermissionRequest`, `seedDesks` (Task 7); `ingest`, `desks` (Task 8); `readFrames`, `replay` (Task 9); `createRoom` (Task 11)
 - Produces: `createFloor(): { setSnapshot(sessions: SessionSnapshot[], permissions: PermissionRequest[]): void; push(frame: Frame): void; desks(): Desk[] }` — the single object the page owns
 
 - [ ] **Step 1: Write the failing test**
@@ -926,12 +926,26 @@ describe('createFloor', () => {
     expect(floor.desks()[0].status).toBe('working')
   })
 
-  it('re-snapshots on reconnect without losing the order of existing desks', () => {
+  it('drops a desk the new snapshot does not mention', () => {
     const floor = createFloor()
     floor.setSnapshot([{ id: 'a' }], [])
     floor.push({ type: 'session.created', data: { sessionID: 'b' } })
     floor.setSnapshot([{ id: 'a' }], [])
+    expect(floor.desks().map(d => d.sessionID)).toEqual(['a'])
+  })
+
+  it('keeps the position of desks that survive a re-snapshot', () => {
+    const floor = createFloor()
+    floor.setSnapshot([{ id: 'a' }, { id: 'b' }], [])
+    floor.setSnapshot([{ id: 'b' }, { id: 'a' }], [])
     expect(floor.desks().map(d => d.sessionID)).toEqual(['a', 'b'])
+  })
+
+  it('shows a permission raised while we were disconnected', () => {
+    const floor = createFloor()
+    floor.setSnapshot([{ id: 'a' }], [])
+    floor.setSnapshot([{ id: 'a' }], [{ requestID: 'p1', sessionID: 'a' }])
+    expect(floor.desks()[0].status).toBe('waiting-on-you')
   })
 })
 ```
@@ -943,7 +957,7 @@ Expected: FAIL — cannot resolve `../../src/app/floor`
 
 - [ ] **Step 3: Implement `createFloor`, then the page**
 
-`createFloor` owns the registry (Task 8) and exposes the three methods above. `setSnapshot` seeds (Task 7) and merges, so desks already on the floor keep their order. `index.html` holds a full-window `<canvas>` and a small toolbar with a **Replay** button and a file input for a `.jsonl`. `src/main.ts` wires: on load, list running servers' sessions to seed, then stream live; the Replay button runs `replay()` against the chosen file and draws on every frame. If `readService()` throws (Task 1), the page shows that message in the toolbar rather than a blank canvas.
+`createFloor` owns the registry (Task 8) and exposes the three methods above. `setSnapshot` **replaces** the desk set rather than merging: the snapshot is authoritative for which sessions exist, so a session deleted while we were disconnected disappears and a permission raised during the gap shows. Desks present in both keep the positions they already had. `index.html` holds a full-window `<canvas>` and a small toolbar with a **Replay** button and a file input for a `.jsonl`. `src/main.ts` wires: on load, list running servers' sessions to seed, then stream live; the Replay button runs `replay()` against the chosen file and draws on every frame. If `readService()` throws (Task 1), the page shows that message in the toolbar rather than a blank canvas.
 
 - [ ] **Step 4: Run all tests**
 

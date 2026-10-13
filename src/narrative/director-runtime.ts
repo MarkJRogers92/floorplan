@@ -52,7 +52,7 @@ export function createDirectorRuntime(request: (scene: DirectorRequest, signal: 
     else start(latest)
   }
   let closed: Pending[] = []
-  const update = (beats: Beat[], sessions: SessionInfo[], flush = false) => {
+  const update = (beats: Beat[], sessions: SessionInfo[], flush = false, live = true) => {
     const scenes = assembleScenes(beats, sessions)
     const index = new Map(beats.map(b => [b.id, b]))
     const sessionIndex = new Map(sessions.map(s => [s.id, s]))
@@ -64,7 +64,7 @@ export function createDirectorRuntime(request: (scene: DirectorRequest, signal: 
         .map(({ id, parentID, agent, model }) => ({ id, parentID, agent, model }))
       const payload: DirectorRequest = { sceneID: scene.id, beats: evidence, sessions: snapshot }
       const seriesKey = seriesKeyForRoot(scene.rootSessionID, sessions)
-      if (seriesKey !== undefined) payload.seriesKey = seriesKey
+      if (live && seriesKey !== undefined) payload.seriesKey = seriesKey
       const signature = JSON.stringify(payload)
       if (!finiteJSON(payload) || snapshot.length > 128 || new TextEncoder().encode(signature).length > 32_768) return
       const pending = { request: payload, root: scene.rootSessionID, signature }

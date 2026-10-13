@@ -116,3 +116,11 @@ it('carries the observed root project scope for local continuity lookup', async 
   await tick()
   expect(sent.seriesKey).toBe('directory:/fake/project')
 })
+it('a replay request has no durable series identity even when its frames name a project', async () => {
+  let sent!: DirectorRequest
+  const runtime = createDirectorRuntime(async request => { sent = request; return output('a') }, () => {})
+  runtime.setEnabled(true)
+  runtime.update([b('a'), b('b')], [{ id: 'root', agent: 'build', seriesKey: 'directory:/fake/replay' }], false, false)
+  await tick()
+  expect(sent.seriesKey).toBeUndefined()
+})

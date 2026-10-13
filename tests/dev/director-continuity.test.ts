@@ -75,6 +75,18 @@ it('a disable during context loading never starts a provider request', async () 
   expect((await pending).mode).toBe('templates')
   expect(calls).toBe(0)
 })
+it('a scoped-out replay can narrate but cannot create archived episodes or personas', async () => {
+  let storage = 0
+  const service = createDirectorService(config, async () => output(), {
+    loadContext: async () => { storage++; return { bibles: [], personas: [] } },
+    savePersonas: async () => { storage++ },
+  })
+  service.control(true)
+  const replay = request(); delete replay.seriesKey
+  expect((await service.direct(replay)).mode).toBe('director')
+  expect(storage).toBe(0)
+  expect(service.state().reservedCents).toBe(3)
+})
 it('provider receives bounded advisory continuity, no old quotes/event IDs and unchanged output cap', async () => {
   let body!: Record<string, any>
   const provider = createDirectorProvider('synthetic-only', async (_, options) => {

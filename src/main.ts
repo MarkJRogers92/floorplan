@@ -4,6 +4,8 @@ import type { Frame } from './api/sse'
 import { streamFrames } from './api/stream'
 import { createFloor } from './app/floor'
 import { directorCall, parseDirectorState } from './app/director-client'
+import { createSeriesClient } from './app/series-client'
+import { scopeFromSnapshot } from './narrative/scope'
 import type { DirectorState } from './narrative/director'
 import { createDirectorRuntime } from './narrative/director-runtime'
 import { createRollup, flush as flushRollup, rollup as rollFrame, seedRollup } from './narrative/rollup'
@@ -22,6 +24,7 @@ const fileInput = document.getElementById('recording') as HTMLInputElement
 const scriptEl = document.getElementById('script')!
 const directorBtn = document.getElementById('director') as HTMLButtonElement
 const directorStatus = document.getElementById('director-status')!
+const historyStatus = document.getElementById('history-status')!
 
 const floor = createFloor()
 const room = createRoom(canvas)
@@ -47,9 +50,11 @@ function setStatus(text: string, isError = false) {
 let rollState = seedRollup(createRollup(), { sessions: [], permissions: [] })
 let beats: Beat[] = []
 let narrativeFlushed = false
+let replaying = false
 let directorEnabled = false
 let directorState: DirectorState | null = null
 const excludedChats = new Set<string>()
+const history = createSeriesClient(fetch, () => { historyStatus.textContent = history.status() })
 const director = createDirectorRuntime((request, signal) => directorCall('scene', request, signal), () => {
   renderNarrative()
   void refreshDirectorState()
@@ -117,6 +122,7 @@ function chatOptOut(root: string) {
 
 function resetNarrative() {
   director.reset()
+  history.reset()
   rollState = seedRollup(createRollup(), { sessions: [], permissions: [] })
   beats = []
   narrativeFlushed = false
@@ -145,7 +151,9 @@ function scriptRow(line: ScriptLine, kind: 'episode' | 'scene' | 'line') {
 function narrate(arrived: Beat[], flushed = false) {
   beats.push(...arrived)
   if (flushed) narrativeFlushed = true
-  director.update(beats, [...rollState.sessions.values()], narrativeFlushed)
+  history.update(beats, [...rollState.sessions.values()], replaying)
+  historyStatus.textContent = history.status()
+  director.update(beats, [...rollState.sessions.values()], narrativeFlushed, !replaying)
   renderNarrative()
 }
 
@@ -224,6 +232,7 @@ async function seedFromREST(service: Service) {
       id: s.id,
       parentID: s.parentID,
       agent: s.agent,
+      seriesKey: scopeFromSnapshot(s),
     })),
     permissions: requests,
   })
@@ -243,6 +252,7 @@ async function startLive(service: Service) {
 }
 
 async function connect(service: Service) {
+  replaying = false
   resetNarrative()
   await seedFromREST(service)
   startLive(service)
@@ -265,6 +275,7 @@ replayBtn.addEventListener('click', () => {
     return
   }
   liveAbort?.abort()
+  replaying = true
   resetNarrative()
   file
     .text()

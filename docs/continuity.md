@@ -13,6 +13,8 @@ The root chat's directory identity governs guests. Project IDs are a fallback wh
 no directory is known; an unknown root is not guessed from Floorplan's working
 directory. An ID-to-directory upgrade uses a separate key without deleting old data.
 Replays do not autosave, so test or incomplete recordings cannot pollute live history.
+Their Director requests also omit durable series identity: an opted-in replay may
+narrate current footage, but cannot archive it or create a persona through that route.
 
 Saving a rejoined partial episode is additive: old beats remain, repeated IDs are
 counted once, and genuinely conflicting immutable beats refuse the entire update.

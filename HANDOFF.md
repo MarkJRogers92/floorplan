@@ -74,6 +74,9 @@ built; they were deferred and are the remaining part of the spec's "done means".
 | `src/narrative/check.ts`, `views.ts` | scene evidence checks and the pure episode view used by the page |
 | `src/narrative/director.ts`, `director-runtime.ts` | pure model-output admission and nonblocking closed-scene scheduler |
 | `src/dev/director-*.ts`, `src/app/director-client.ts` | server-only paid boundary and browser-safe controls client |
+| `src/narrative/scope.ts`, `series.ts`, `bible.ts` | project identity, additive archive validation and evidence-backed character statistics |
+| `server/series-store.ts`, `src/dev/series-route.ts`, `http-guard.ts` | private atomic local files and guarded loopback archive/context routes |
+| `src/app/series-client.ts` | nonblocking live milestone saves, read-through context and visible storage status; no replay saves |
 | `src/room/{layout,room}.ts` | pure geometry, then canvas drawing |
 | `src/app/floor.ts` | `createFloor` — the object the page owns |
 | `src/main.ts`, `index.html` | the page — script primary column, floor panel beside it |
@@ -159,8 +162,8 @@ needs a visible-window check; citations are present in the DOM.
 implemented** (5 tasks, 280 tests; independent MiniMax review found no blockers): beat end timestamps,
 guarded absence slots, single-location scenes, chat-based episodes, the §5.2 checker,
 and episode/scene rendering beside the unchanged floor. Real quoted speech and explicit
-flashback markers are rendered distinctly. Everything is still template-only: no
-model calls, key, spend, new dependency, or series store.
+flashback markers are rendered distinctly. That slice was template-only; the optional
+Director and local continuity are described below.
 
 **Director runtime (slice 3a) is implemented:** optional checked scene replacement,
 separate server-only key, explicit configuration AND page opt-in, conservative 3¢
@@ -169,8 +172,18 @@ single-flight/deduplication and stale-response protection. Setup/privacy/limits 
 `docs/director.md`; `.env.example` contains no key. All tests use synthetic providers;
 no real key was configured and no paid generation was performed.
 
-Series storage, recaps, character bibles/personas, plot labels and staged visuals
-remain next. Before extending episode lifecycle, read the slice-2 execution notes;
+**Series continuity is implemented:** root-project-scoped private archives survive
+reloads/restarts, partial rejoins merge without deleting old beats, and character bibles
+retain exact evidence refs. Live scene boundaries/wraps save asynchronously; unknown
+scope and replays remain unarchived. Replays also omit durable identity from Director
+requests, so an opted-in replay cannot write personas through that second path.
+The existing Director completion reuses bounded advisory history and may save a
+write-once invented persona with an archived debut; no extra model call is added.
+See `docs/continuity.md` for privacy, bounds and safe failure behavior. No keys or paid
+app calls were used in verification. The no-key golden browser replay stayed at zero
+archived episodes and zero reserved cents (204 frames, 44 lines, 12 checked scenes).
+
+Recaps, plot labels and staged visuals remain next. Before extending episode lifecycle, read the slice-2 execution notes;
 that plan's original timeout contradicted D2 and was not implemented.
 The same notes record final review rulings and deferred minors. In particular,
 `{never:}` requires episode-wide closure (not scene closure), full DOM rebuilds may

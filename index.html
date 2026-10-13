@@ -70,6 +70,19 @@
         text-transform: uppercase;
         color: #9ca3af;
       }
+      #script .episode {
+        margin-top: 12px;
+        font-weight: 600;
+      }
+      #script section[data-check="fail"] {
+        border-left: 2px solid #f87171;
+        padding-left: 8px;
+      }
+      #script .line[data-flashback="true"]::before {
+        content: 'Flashback — ';
+        color: #9ca3af;
+        font-size: 12px;
+      }
       #script .line {
         margin: 0 0 6px;
       }
@@ -88,7 +101,8 @@
         color: #6b7280;
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       }
-      #script .line:hover .beats, #script .scene:hover .beats {
+      #script .line:hover .beats, #script .scene:hover .beats, #script .episode:hover .beats,
+      #script :focus .beats {
         display: inline;
       }
       #floor {
@@ -113,7 +127,7 @@
         <span id="status">connecting…</span>
       </div>
       <div id="stage">
-        <div id="script"></div>
+        <div id="script" role="region" aria-label="Episode script"></div>
         <div id="floor"><canvas id="canvas"></canvas></div>
       </div>
     </div>

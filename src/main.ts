@@ -3,10 +3,10 @@ import type { Service } from './api/service'
 import type { Frame } from './api/sse'
 import { streamFrames } from './api/stream'
 import { createFloor } from './app/floor'
-import { castFor } from './narrative/cast'
 import { createRollup, flush as flushRollup, rollup as rollFrame, seedRollup } from './narrative/rollup'
-import { assembleScript, sceneHeadingFor, type ScriptLine } from './narrative/script'
+import type { ScriptLine } from './narrative/script'
 import type { Beat } from './narrative/types'
+import { assembleEpisodeViews } from './narrative/views'
 import { parseRecording } from './replay/parse'
 import { replayFrames } from './replay/play'
 import { createRoom } from './room/room'
@@ -41,49 +41,60 @@ function setStatus(text: string, isError = false) {
  */
 let rollState = seedRollup(createRollup(), { sessions: [], permissions: [] })
 let beats: Beat[] = []
-let lastSession = ''
 
 function resetNarrative() {
   rollState = seedRollup(createRollup(), { sessions: [], permissions: [] })
   beats = []
-  lastSession = ''
   scriptEl.replaceChildren()
 }
 
-function appendScriptLine(line: ScriptLine, scene: boolean) {
+function scriptRow(line: ScriptLine, kind: 'episode' | 'scene' | 'line') {
   const row = document.createElement('div')
-  row.className = scene ? 'scene' : 'line'
+  row.className = kind
   row.dataset.beats = line.beatIDs.join(' ')
-  if (!scene) row.dataset.delivery = line.delivery
+  row.tabIndex = 0
+  if (kind === 'line') {
+    row.dataset.delivery = line.delivery
+    if (line.line.flashback) row.dataset.flashback = 'true'
+  }
   const text = document.createElement('span')
   text.textContent = line.text
   const ids = document.createElement('span')
   ids.className = 'beats'
   ids.textContent = line.beatIDs.join(' ')
   row.append(text, ids)
-  scriptEl.append(row)
-  scriptEl.scrollTop = scriptEl.scrollHeight
+  return row
 }
 
-/** One line per beat, in arrival order; a new `sessionID` starts a new scene heading. */
+/** Rebuild the pure episode view so newly learned cast names and scene cuts stay current. */
 function narrate(arrived: Beat[]) {
-  if (arrived.length === 0) return
   beats.push(...arrived)
-  const ctx = { cast: castFor([...rollState.sessions.values()]), beats }
-  for (const beat of arrived) {
-    if (beat.sessionID !== lastSession) {
-      lastSession = beat.sessionID
-      appendScriptLine(sceneHeadingFor(beat, ctx), true)
+  const content = document.createDocumentFragment()
+  for (const view of assembleEpisodeViews(beats, [...rollState.sessions.values()])) {
+    const episode = document.createElement('section')
+    episode.dataset.episode = view.episode.id
+    episode.append(scriptRow(view.heading, 'episode'))
+    for (const group of view.scenes) {
+      const scene = document.createElement('section')
+      scene.dataset.scene = group.scene.id
+      scene.dataset.check = group.check.ok ? 'pass' : 'fail'
+      if (!group.check.ok) scene.title = group.check.failures.join('\n')
+      scene.append(scriptRow(group.heading, 'scene'))
+      for (const line of group.lines) scene.append(scriptRow(line, 'line'))
+      episode.append(scene)
     }
-    for (const line of assembleScript([beat], ctx)) appendScriptLine(line, false)
+    content.append(episode)
   }
+  scriptEl.replaceChildren(content)
+  scriptEl.scrollTop = scriptEl.scrollHeight
 }
 
 function pushFrame(frame: Frame) {
   floor.push(frame)
+  const priorSessions = rollState.sessions
   const folded = rollFrame(rollState, frame)
   rollState = folded.state
-  narrate(folded.beats)
+  if (folded.beats.length || priorSessions !== rollState.sessions) narrate(folded.beats)
   draw()
 }
 

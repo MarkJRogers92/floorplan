@@ -15,12 +15,16 @@ Use textContent/native summary for safe text and keyboard accessibility.
 
 ## Read-through client
 
-Read context when a live root with known scope/agents is first observed, even before
-a save milestone. Cache by BOTH series key and root ID: the server excludes that root,
+Read context when a live root has observed footage and known scope/agents, even before
+a save milestone. Metadata-only REST roots have no displayed episode and do not read
+history. Cache by BOTH series key and root ID: the server excludes that root,
 so a project-wide-only cache is incorrect when two live chats share a project.
 Refresh on agent-list changes and acknowledged saves; ignore/abort superseded reads.
+Keep last-good context during agent changes; current-cast filtering prevents departed
+agents from being shown, and the open disclosure remains present while new data loads.
 Reset/replay abort reads and clear context; replay never fetches durable history.
-Read failures stay visible and never abort saving, the floor or template narration.
+Read failures are reported in the shared status and never abort saving, the floor or
+template narration. Later read/save activity may replace that status message.
 No fetch on each frame for unchanged scope/root/agents. Current cast only, at most8.
 
 `CastMemoryContext = {key,episodeCount,bibles:{agent,episodes}[],personas:Persona[]}`.

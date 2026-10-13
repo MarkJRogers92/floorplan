@@ -221,9 +221,21 @@ open disclosure state across script rebuilds, and keeps empty/replay memory abse
 No dependencies/provider calls/archive edits/art changes. Synthetic real-page browser
 checks verified two-root isolation, literal markup-like agent names, invented labels,
 debut references, open-state persistence, and replay with no new GET/POST or cards.
-The follow-up baseline is405 tests/41 files with typecheck/build clean; private server
+The follow-up final suite is407 tests/41 files with typecheck/build clean; private server
 data remains absent from the browser bundle. Browser boundaries were synthetic and
 no archive/provider calls were made by the test harness; by-eye appearance is unverified.
+Independent Space Bunny review ran405 tests/typecheck and found two Important issues,
+both fixed RED→GREEN: keep last-good context during new-agent refresh (native disclosure
+stays open), and only read history for roots with observed footage (200 metadata-only
+roots now cause zero GETs, one visible root causes one). A delayed-read real-page guest
+arrival regression confirms the panel stays open before/after refresh and gains the
+guest's history. Native focus/click worked, but browser key presses delivered no DOM
+key events; actual keyboard activation still needs a visible-window check.
+Deferred follow-up minors: unchanged failed reads wait for save/cast change and full
+bible responses can hit the2MiB context cap; shared read/save status messages replace
+one another; last-agent status updates are cosmetic; original browser assertions are
+recorded as structural checks rather than a shipped browser runner (the new guest
+refresh assertion is retained in the scratch harness).
 
 Recaps, plot labels and staged visuals remain next. Before extending episode lifecycle, read the slice-2 execution notes;
 that plan's original timeout contradicted D2 and was not implemented.

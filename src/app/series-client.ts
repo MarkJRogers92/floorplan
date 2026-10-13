@@ -28,7 +28,6 @@ export function createSeriesClient(fetcher: typeof fetch = fetch, changed: () =>
     const signature = JSON.stringify(agents)
     if (refresh && readSignatures.get(id) !== signature) return
     if (!refresh && readSignatures.get(id) === signature) return
-    if (readSignatures.get(id) !== signature) cached.delete(id)
     readSignatures.set(id, signature)
     reads.get(id)?.abort()
     if (!agents.length) { reads.delete(id); return }
@@ -124,16 +123,15 @@ export function createSeriesClient(fetcher: typeof fetch = fetch, changed: () =>
     }
     if (replayMode) reset()
     const index = new Map(sessions.map(s => [s.id, s]))
-    const roots = new Set(sessions.map(s => rootFor(s.id, index)))
-    for (const root of roots) {
-      const key = seriesKeyForRoot(root, sessions)
-      if (key) loadContext(key, root, agentsFor(sessions.filter(s => rootFor(s.id, index) === root)))
-    }
     const groups = new Map<string, Beat[]>()
     for (const beat of beats) {
       const root = rootFor(beat.sessionID, index)
       const group = groups.get(root) ?? []
       group.push(beat); groups.set(root, group)
+    }
+    for (const root of groups.keys()) {
+      const key = seriesKeyForRoot(root, sessions)
+      if (key) loadContext(key, root, agentsFor(sessions.filter(s => rootFor(s.id, index) === root)))
     }
     const scenes = assembleScenes(beats, sessions)
     const beatIndex = new Map(beats.map(b => [b.id, b]))

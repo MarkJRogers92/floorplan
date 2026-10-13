@@ -20,9 +20,14 @@ Live episodes have an optional, collapsed **Cast memory** disclosure. It shows t
 current real cast's saved “Invented persona” with its stored debut reference and
 “Previous appearances” as archived episode IDs, excluding the current chat. Empty,
 unknown-scope and replay memory stays hidden. These are local archive references,
-not new story lines, work claims or a replay/quote browser. Reads begin when root
-scope/cast is known, without waiting for a save; two chats in one project have distinct
-root-excluding caches. Failed/superseded reads cannot delay saving or narration.
+not new story lines, work claims or a replay/quote browser. Reads begin with a root's
+first observed footage and known scope/cast, without waiting for a save; metadata-only
+chats do not read history. Two chats in one project have distinct root-excluding caches.
+Last-good cards remain during cast refresh, filtered to current agents. Failed or
+superseded reads cannot delay saving/narration; the shared status reports failures but
+later activity can replace the message. An unchanged cast's failed read waits for a
+save or cast change before retrying; very large full-bible responses may hit the2MiB
+context limit and hide this optional view while live narration continues.
 
 Saving a rejoined partial episode is additive: old beats remain, repeated IDs are
 counted once, and genuinely conflicting immutable beats refuse the entire update.

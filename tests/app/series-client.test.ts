@@ -181,6 +181,8 @@ it('reads scoped cast context before a milestone, without POST or repeated GETs'
     gets.push(String(url)); return Response.json(context)
   })
   client.update([], sessions)
+  await tick(); expect(gets).toHaveLength(0)
+  client.update([beat('first')], sessions)
   await tick()
   expect(gets).toHaveLength(1)
   expect(new URL(gets[0], 'http://local').searchParams.get('root')).toBe('root')
@@ -190,11 +192,12 @@ it('reads scoped cast context before a milestone, without POST or repeated GETs'
   await tick(); expect(gets).toHaveLength(1)
 })
 it('two live roots in one project cache their own root-excluding context', async () => {
-  const client = createSeriesClient(async url => {
+  const client = createSeriesClient(async (url, options) => {
+    if (options?.method === 'POST') return Response.json({ saved: true, episodeCount: 2 })
     const root = new URL(String(url), 'http://local').searchParams.get('root')
     return Response.json({ ...context, bibles: [{ agent: 'build', episodes: [root === 'root' ? 'ep:other' : 'ep:root'] }] })
   })
-  client.update([], [...sessions, { ...sessions[0], id: 'other' }])
+  client.update([beat('first'), { ...beat('second'), sessionID: 'other' }], [...sessions, { ...sessions[0], id: 'other' }])
   await tick()
   expect(client.contextFor(sessions[0].seriesKey, 'root')?.bibles[0].episodes).toEqual(['ep:other'])
   expect(client.contextFor(sessions[0].seriesKey, 'other')?.bibles[0].episodes).toEqual(['ep:root'])
@@ -209,8 +212,8 @@ it('an agent change aborts the old read and rejects its late reply', async () =>
     if (calls === 1) { oldSignal = options!.signal as AbortSignal; return wait }
     return Response.json({ ...context, bibles: [{ agent: 'explore', episodes: ['ep:old'] }] })
   })
-  client.update([], sessions)
-  client.update([], [{ ...sessions[0], agent: 'explore' }])
+  client.update([beat('first')], sessions)
+  client.update([beat('first')], [{ ...sessions[0], agent: 'explore' }])
   await tick(); expect(oldSignal.aborted).toBe(true)
   release(Response.json({ ...context, bibles: [{ agent: 'build', episodes: ['ep:stale'] }] }))
   await tick()
@@ -241,7 +244,7 @@ it('replay aborts a pending read and clears history without any POST', async () 
     expect(options?.method).not.toBe('POST')
     signal = options!.signal as AbortSignal; return wait
   })
-  client.update([], sessions)
+  client.update([beat('first')], sessions)
   client.update([], sessions, true)
   expect(signal.aborted).toBe(true)
   release(Response.json(context))
@@ -254,8 +257,8 @@ it('losing a known agent cancels its pending read without guessing another ident
   let signal!: AbortSignal
   const wait = new Promise<Response>(r => { release = r })
   const client = createSeriesClient(async (_, options) => { signal = options!.signal as AbortSignal; return wait })
-  client.update([], sessions)
-  client.update([], [{ ...sessions[0], agent: undefined }])
+  client.update([beat('first')], sessions)
+  client.update([beat('first')], [{ ...sessions[0], agent: undefined }])
   expect(signal.aborted).toBe(true)
   release(Response.json(context)); await tick()
   expect(client.contextFor(sessions[0].seriesKey, 'root')).toBeUndefined()
@@ -287,9 +290,37 @@ it('a successful later read clears its unavailable status without claiming a sav
     if (calls === 1) throw new Error('offline')
     return Response.json(context)
   })
-  client.update([], sessions); await tick()
+  client.update([beat('first')], sessions); await tick()
   expect(client.status()).toContain('context unavailable')
-  client.update([], [{ ...sessions[0], agent: 'explore' }]); await tick()
+  client.update([beat('first')], [{ ...sessions[0], agent: 'explore' }]); await tick()
   expect(client.status()).not.toContain('unavailable')
   expect(client.status()).not.toContain('saved')
+})
+it('retains last-good current-agent memory while a newly joined agent read is pending', async () => {
+  let release!: (v: Response) => void
+  const wait = new Promise<Response>(r => { release = r })
+  let calls = 0
+  const client = createSeriesClient(async () => {
+    calls++
+    return calls === 1 ? Response.json({ ...context, bibles: [{ agent: 'build', episodes: ['ep:old'] }] }) : wait
+  })
+  client.update([beat('first')], sessions); await tick()
+  client.update([beat('first')], [...sessions, { id: 'guest', parentID: 'root', agent: 'review' }])
+  expect(client.contextFor(sessions[0].seriesKey, 'root')?.bibles[0].episodes).toEqual(['ep:old'])
+  release(Response.json({ ...context, bibles: [{ agent: 'build', episodes: ['ep:old'] }, { agent: 'review', episodes: ['ep:prior'] }] }))
+  await tick()
+  expect(client.contextFor(sessions[0].seriesKey, 'root')?.bibles.map(b => b.agent)).toEqual(['build', 'review'])
+})
+it('a two-hundred-chat snapshot reads only the root that has visible evidence', async () => {
+  const roots = Array.from({ length: 200 }, (_, i) => ({ ...sessions[0], id: `root${i}` }))
+  const gets: string[] = []
+  const client = createSeriesClient(async (url, options) => {
+    expect(options?.method).not.toBe('POST')
+    gets.push(new URL(String(url), 'http://local').searchParams.get('root')!)
+    return Response.json(context)
+  })
+  client.update([], roots); await tick()
+  expect(gets).toEqual([])
+  client.update([{ ...beat('first'), sessionID: 'root0' }], roots); await tick()
+  expect(gets).toEqual(['root0'])
 })

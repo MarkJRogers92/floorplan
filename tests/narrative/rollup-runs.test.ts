@@ -92,6 +92,18 @@ describe('calls join by id', () => {
     expect(beats[0].detail).toEqual({ kind: 'uses-tool', tool: 'unknown', callID: 'c1' })
   })
 
+  it('does not let the opener and a mid-call beat share an id on a seeded root', () => {
+    // The opener has not been spent yet, so the first real work opens the episode.
+    // That work is a call we joined mid-stream: the call beat is named by this
+    // frame's id, so the opener must take the fallback id instead.
+    const s = seedRollup(createRollup(), { sessions: [{ id: 'x' }], permissions: [] })
+    const { beats } = drive(s, [f('tool.success', { sessionID: 'x', id: 'c1' }, { id: 'c' })])
+    expect(beats.map(b => b.kind)).toEqual(['episode-opens', 'uses-tool'])
+    expect(beats[0].id).not.toBe(beats[1].id)
+    expect(beats[0].id).toBe('b:episode-opens:x:0')
+    expect(beats[1].id).toBe('b:c')
+  })
+
   it('raises tool-fails immediately', () => {
     const { beats } = drive(seeded(), [f('tool.failed', { sessionID: 'x', id: 'c1', name: 'write' }, { id: 'z' })])
     expect(beats[0].kind).toBe('tool-fails')

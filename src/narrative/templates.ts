@@ -48,7 +48,7 @@ export function templateFor(beat: Beat, ctx: Ctx): Line {
       if (runDetail.text !== undefined && runDetail.text !== '') {
         return character(agentOf(beat, ctx), '{quote:' + id(beat) + '}', [id(beat)])
       }
-      return narrator('{agent:' + id(beat) + '} spoke {deltas:' + id(beat) + '} times.', [id(beat)])
+      return narrator('{agent:' + id(beat) + '} said its piece in {deltas:' + id(beat) + '} parts.', [id(beat)])
     }
 
     case 'uses-tool': {
@@ -64,7 +64,7 @@ export function templateFor(beat: Beat, ctx: Ctx): Line {
       return narrator('{agent:' + id(beat) + '} arrived.', [id(beat)])
 
     case 'guest-leaves':
-      return narrator('{agent:' + id(beat) + '} left.', [id(beat)])
+      return narrator('A guest left.', [id(beat)])
 
     case 'knocks':
       return narrator('Someone knocked.', [id(beat)])

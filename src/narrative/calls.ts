@@ -71,7 +71,7 @@ export function foldCall(params: {
   frame: Frame
   sessionID: string
   at: number
-  openEpisode: (subject: string) => void
+  openEpisode: (subject: string, openerEventIDs?: string[]) => void
   beatID: (eventIDs: string[], kind: BeatKind, sessionID: string, at: number) => string
 }): { calls: Map<string, OpenCall>; beats: Beat[] } {
   const { calls: initialCalls, frame, sessionID, at, openEpisode, beatID } = params
@@ -155,7 +155,10 @@ export function foldCall(params: {
     const callAt = existing?.at ?? at
     const exit = exitCode(data, existing)
 
-    openEpisode(sessionID) // §4.1: a call beat may be the root's first beat
+    // §4.1: a call beat may be the root's first beat. If we joined the call
+    // mid-stream, its beat will be named by this frame's id; spend the opener
+    // with no event id so the two never collide.
+    openEpisode(sessionID, existing === undefined ? [] : undefined)
 
     if (raisesToolFails(type, data, existing)) {
       const detail: BeatDetail = {

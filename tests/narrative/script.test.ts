@@ -42,7 +42,7 @@ describe('assembleScript', () => {
   it('falls back to a narrator line when a says beat has no source text', () => {
     const beats = [b('b:1', 'says', { kind: 'says', deltas: 3 }, 0)]
     const [only] = assembleScript(beats, ctx(beats))
-    expect(only.text).toBe('build spoke 3 times.')
+    expect(only.text).toBe('build said its piece in 3 parts.')
     expect(only.delivery).toBe('narration')
     expect(only.beatIDs).toEqual(['b:1'])
   })

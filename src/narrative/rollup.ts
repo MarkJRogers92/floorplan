@@ -125,8 +125,8 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
   let working = priorTrack?.working === true
 
   /** A beat raised by this frame alone: its one event is the frame's own. */
-  const raise = (kind: BeatKind, subject: string, detail: BeatDetail): Beat => {
-    const eventIDs = id === undefined ? [] : [id]
+  const raise = (kind: BeatKind, subject: string, detail: BeatDetail, openerEventIDs?: string[]): Beat => {
+    const eventIDs = openerEventIDs ?? (id === undefined ? [] : [id])
     return { id: beatID(eventIDs, kind, subject, at), at, eventIDs, kind, sessionID: subject, detail }
   }
 
@@ -143,11 +143,11 @@ export function rollup(state: RollupState, frame: Frame): { state: RollupState; 
    * trigger; this holds the once-per-root rule. Task 2's call beats open the episode from
    * their own emission the same way.
    */
-  const openEpisode = (subject: string): void => {
+  const openEpisode = (subject: string, openerEventIDs?: string[]): void => {
     const info = sessions.get(subject)
     if (info === undefined || info.arrived === true || !roots.has(subject)) return
     sessions = setSession(sessions, { ...info, arrived: true })
-    beats.push(raise('episode-opens', subject, { kind: 'episode-opens' }))
+    beats.push(raise('episode-opens', subject, { kind: 'episode-opens' }, openerEventIDs))
   }
 
   // --- the cast: who this session is, and who its parent is (§4.1 seeding) --------

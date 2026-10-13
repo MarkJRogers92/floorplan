@@ -135,3 +135,60 @@ DOM/browser evidence if the desktop window is hidden.
 Actual no-key golden browser replay completed: 44 lines, 12 scenes, 0 check failures,
 0 Director scenes, 0 cents reserved; failing exit/denial/40-second gap preserved.
 Screenshot was refused again because the desktop window was hidden.
+
+## Final independent review
+
+DeepSeek API (`deepseek/deepseek-flash`, mark-deepseek-api) independently reviewed
+`9264bf7..b0ee10f`, ran all 334 tests/typecheck/build, and approved with no blocking
+findings. Its throwaway probes confirmed chunked40KB requests get413/provider0,
+forged/rebinding Hosts get403/provider0, missing/foreign POST Origins get403, two
+concurrent identical scenes spend one3¢ reservation, and deliberately lossy golden
+outputs retain every beat. KimiK3/MiniMaxM3 Go review attempts failed once each with
+quota errors and were not retried. DeepSeek Go only checked the design; Sol wrote code.
+No app Director/provider generation or real key configuration was performed.
+
+Deferred minors (verified against source):
+
+1. Disable/re-enable does not restore already attempted narration. `considered`
+   retains identities while displayed results are cleared; new scenes still work.
+   Restoring cached completed output later must NOT accidentally request scenes
+   skipped before any provider attempt. No retry feature is added speculatively.
+2. Attempts/episode accounting/opt-outs stay in memory for this dev-server run.
+   Attempt cache is bounded by the configured run cap (33 attempts at the default
+   $1/3¢ reservation), NOT an unbounded replay-fed provider cache. Raised caps can
+   retain more data; opt-out identifiers are not pruned. Aborted/failed scenes stay
+   failed/template-only rather than automatically spending again.
+3. A transient public-state fetch failure pauses the client, clears displayed model
+   narration, and labels it “not configured”; improve wording/cache behavior later.
+   Completion/state refresh also causes two full DOM rebuilds.
+4. HTTP send guards destroyed responses but not writableEnded/socket exceptions.
+   Review could not reproduce a double-send or rejection; each normal path returns
+   after one send. Defensive hardening can ride with wider route work.
+5. Client disconnect/reload does not itself abort the server's provider request.
+   Reservations remain charged and completed responses are cached. Global disable
+   and root opt-out DO abort; existing docs disclose possible charge after cancellation.
+
+Rulings on review limits:
+
+- Live provider acceptance/quality remains untested by choice: no key or app paid call.
+  Wire fields/model/prices were checked against current docs, not a real completion.
+  Cost if wrong: safe provider-error fallback, no unchecked output.
+- Keep the conservative **one token per UTF-8 byte** bound, not an average four
+  bytes/token. Worst-case65,536 input tokens =2.62144¢;1,024 output =0.16384¢,
+  plus bounded wrapper overhead still fits3¢. Review's “~0.8¢ worst case” was an
+  average-token estimate, not the implemented spending bound. Cost if wrong:
+  recheck published pricing/token overhead before enabling or changing model/limits.
+- Visual controls/badges still need a visible window; DOM replay is not by-eye review.
+  Cost if wrong: an unseen layout/affordance issue remains.
+- Scene-local slot arithmetic uses existing line tests plus the new admission/view
+  coverage checks; episode-scale ordinal/absence/cost slots are explicitly rejected.
+  No semantic-humor verdict is inferred from coverage. Cost if wrong: templates remain
+  the fallback and a new factual regression needs its own fixture.
+- Caps30¢/100¢ are Sol's disclosed defaults, not a claim of ideal budget or actual spend.
+  Owner can set integer-cent caps/provider limits. Cost if wrong: too little narration,
+  not unauthorized automatic expansion of the budget.
+
+Owner routing update: after the current approved worker route is exhausted, use Ling
+then Space Bunny for eligible non-confidential work only. This does not change the
+app's separately opt-in fixed Director model or disclose secrets/recordings to free
+workers. No free worker was used in this slice.

@@ -33,6 +33,11 @@ The global disable stops scheduling and aborts the in-flight request. A per-chat
 opt-out excludes that root and its guests. A request already sent may still incur
 a charge; its reply cannot be displayed after disable/opt-out/replay reset.
 Slow narration keeps only the latest waiting scene; skipped scenes retain templates.
+Disabling/opt-out removes displayed model narration. Re-enabling currently applies
+to newly closing scenes, not already attempted ones; aborted attempts are not retried.
+Reload/replay may reuse a completed server-cached response without another provider
+call, but does not retry a cached failure. A transient state-route failure also pauses
+the client and returns it to templates.
 
 The middleware is dev-only and loopback-only. POST requires matching Origin and
 Host plus JSON. Vite CORS is disabled explicitly; forged Hosts/foreign origins fail

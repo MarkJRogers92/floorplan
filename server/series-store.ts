@@ -9,6 +9,7 @@ import { validSeriesKey } from '../src/narrative/scope'
 import { isRecord } from '../src/narrative/evidence'
 import { parseArchivedEpisode, parseSeriesArchive, mergeEpisode, validPersonaText,
   MAX_ARCHIVE_BYTES, type ArchivedEpisode, type SeriesArchive } from '../src/narrative/series'
+import type { DirectorContinuityHooks } from '../src/narrative/director'
 
 export class SeriesStoreError extends Error {
   constructor(public code: 'invalid' | 'corrupt' | 'unsafe' | 'busy' | 'conflict' | 'full' | 'unavailable') {
@@ -137,4 +138,16 @@ export function createSeriesStore(root = join(homedir(), '.local/state/floorplan
       personas: archive.personas.filter(p => agents.includes(p.agent)) }
   }
   return { load, saveEpisode, savePersonas, context }
+}
+
+export function createContinuityHooks(store: ReturnType<typeof createSeriesStore>): DirectorContinuityHooks {
+  return {
+    loadContext: (request, root, agents) => request.seriesKey ? store.context(request.seriesKey, root, agents) :
+      Promise.resolve({ bibles: [], personas: [] }),
+    savePersonas: async (request, root, proposals) => {
+      if (!request.seriesKey) return
+      await store.savePersonas(request.seriesKey, { id: `ep:${root}`, rootSessionID: root, seriesKey: request.seriesKey,
+        sessions: request.sessions, beats: request.beats }, proposals)
+    },
+  }
 }

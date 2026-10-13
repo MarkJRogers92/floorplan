@@ -5,9 +5,16 @@ import { renderLine, type Line } from './line'
 import { assembleScript, markFlashbacks, type ScriptLine } from './script'
 import type { Scene } from './scene'
 import type { Beat, SessionInfo } from './types'
+import type { CharacterBible } from './bible'
+import type { Persona } from './series'
 
 export type DirectorResult = { lines: ScriptLine[]; mode: 'director' | 'templates' }
-export type DirectorRequest = { sceneID: string; beats: Beat[]; sessions: SessionInfo[] }
+export type DirectorRequest = { sceneID: string; beats: Beat[]; sessions: SessionInfo[]; seriesKey?: string }
+export type DirectorContinuity = { bibles: CharacterBible[]; personas: Persona[] }
+export type DirectorContinuityHooks = {
+  loadContext: (request: DirectorRequest, root: string, agents: string[]) => Promise<DirectorContinuity>
+  savePersonas: (request: DirectorRequest, root: string, proposals: unknown) => Promise<void>
+}
 export type DirectorState = { available: boolean; enabled: boolean; model: string; episodeCapCents: number;
   runCapCents: number; reservedCents: number; excluded: string[] }
 export type DirectorResponse = { lines: Line[]; mode: 'director' | 'templates'; reason: string }

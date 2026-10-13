@@ -1,4 +1,5 @@
-import { checkDirectorLines, type DirectorRequest, type DirectorState, type DirectorResponse } from '../narrative/director'
+import { checkDirectorLines, type DirectorRequest, type DirectorState, type DirectorResponse,
+  type DirectorContinuity, type DirectorContinuityHooks } from '../narrative/director'
 import { assembleScenes } from '../narrative/scene'
 import { parseDirectorRequest } from './director-input'
 import { DIRECTOR_MODEL } from './director-provider'
@@ -15,7 +16,9 @@ export function directorConfig(env: Record<string, string>): DirectorConfig {
     episodeCapCents, runCapCents }
 }
 
-export function createDirectorService(config: DirectorConfig, complete: (request: DirectorRequest, signal: AbortSignal) => Promise<unknown>) {
+export function createDirectorService(config: DirectorConfig,
+  complete: (request: DirectorRequest, signal: AbortSignal, context: DirectorContinuity) => Promise<unknown>,
+  hooks: Partial<DirectorContinuityHooks> = {}) {
   const available = Boolean(config.key && config.enabled && Number.isInteger(config.episodeCapCents) &&
     Number.isInteger(config.runCapCents) && config.episodeCapCents >= 3 && config.runCapCents >= 3)
   let enabled = false
@@ -61,9 +64,21 @@ export function createDirectorService(config: DirectorConfig, complete: (request
     active = { root, controller }
     const promise = (async (): Promise<DirectorResponse> => {
       try {
-        const output = await complete(request, controller.signal)
+        let context: DirectorContinuity = { bibles: [], personas: [] }
+        if (request.seriesKey && hooks.loadContext) {
+          const agents = [...new Set(request.beats.map(b => request.sessions.find(s => s.id === b.sessionID)?.agent)
+            .filter((agent): agent is string => Boolean(agent) && agent !== 'unidentified'))]
+          try { context = await hooks.loadContext(request, root, agents) } catch { /* Broken history is never invented. */ }
+        }
+        if (controller.signal.aborted || started !== epoch || !enabled || excluded.has(root)) return fallback('disabled')
+        const output = await complete(request, controller.signal, context)
         if (controller.signal.aborted || started !== epoch || !enabled || excluded.has(root)) return fallback('disabled')
         const result = checkDirectorLines(scene, output, request.beats, request.sessions)
+        if (result.mode === 'director' && request.seriesKey && hooks.savePersonas) {
+          const proposals = output !== null && typeof output === 'object' && 'personas' in output ? output.personas : undefined
+          try { await hooks.savePersonas(request, root, proposals) } catch { /* Local storage cannot block checked narration. */ }
+          if (controller.signal.aborted || started !== epoch || !enabled || excluded.has(root)) return fallback('disabled')
+        }
         return { lines: result.lines.map(l => l.line), mode: result.mode, reason: result.mode === 'director' ? 'checked' : 'invalid' }
       } catch { return fallback('failed') }
       finally { if (active?.controller === controller) active = undefined }

@@ -106,5 +106,13 @@ it('sends the complete chat snapshot, preserving duplicate-agent suffixes, not o
   runtime.update([b('a'), b('b')], [...sessions, { id: 'kid', parentID: 'root', agent: 'build' }, { id: 'other', agent: 'build' }])
   await tick()
   expect(sent.sessions.map(s => s.id)).toEqual(['root', 'kid'])
-  expect(sent.beats[0].eventIDs).toEqual([])
+  expect(sent.beats[0].eventIDs).toEqual(['a'])
+})
+it('carries the observed root project scope for local continuity lookup', async () => {
+  let sent!: DirectorRequest
+  const runtime = createDirectorRuntime(async request => { sent = request; return output('a') }, () => {})
+  runtime.setEnabled(true)
+  runtime.update([b('a'), b('b')], [{ id: 'root', agent: 'build', seriesKey: 'directory:/fake/project' }])
+  await tick()
+  expect(sent.seriesKey).toBe('directory:/fake/project')
 })

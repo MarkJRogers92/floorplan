@@ -4,6 +4,7 @@ import { checkDirectorLines, type DirectorRequest } from './director'
 import type { Line } from './line'
 import { assembleScenes } from './scene'
 import type { Beat, SessionInfo } from './types'
+import { seriesKeyForRoot } from './scope'
 
 type Pending = { request: DirectorRequest; root: string; signature: string }
 const finiteJSON = (v: unknown): boolean => typeof v === 'number' ? Number.isFinite(v) :
@@ -58,10 +59,12 @@ export function createDirectorRuntime(request: (scene: DirectorRequest, signal: 
     const next = new Map<string, Pending>()
     closed = []
     scenes.forEach((scene, i) => {
-      const evidence = scene.beats.map(id => ({ ...index.get(id)!, eventIDs: [] }))
+      const evidence = scene.beats.map(id => index.get(id)!)
       const snapshot = sessions.filter(s => rootFor(s.id, sessionIndex) === scene.rootSessionID)
         .map(({ id, parentID, agent, model }) => ({ id, parentID, agent, model }))
       const payload: DirectorRequest = { sceneID: scene.id, beats: evidence, sessions: snapshot }
+      const seriesKey = seriesKeyForRoot(scene.rootSessionID, sessions)
+      if (seriesKey !== undefined) payload.seriesKey = seriesKey
       const signature = JSON.stringify(payload)
       if (!finiteJSON(payload) || snapshot.length > 128 || new TextEncoder().encode(signature).length > 32_768) return
       const pending = { request: payload, root: scene.rootSessionID, signature }

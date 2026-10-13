@@ -106,13 +106,18 @@ describe('dedupe — a reconnect replays frames we have already seen', () => {
 })
 
 describe('seeding — joining a session mid-stream still gives it a root, a parent and a cast', () => {
-  it('knows a session that was created before we connected', () => {
+  it('knows a session that was created before we connected, and narrates no arrival for it', () => {
     const s = seedRollup(createRollup(), {
       sessions: [{ id: 'root', agent: 'plan' }, { id: 'child', parentID: 'root', agent: 'build' }],
       permissions: [],
     })
-    const r = rollup(s, f('text.started', { sessionID: 'child' }))
-    expect(r.beats[0].sessionID).toBe('child')
+    // An arrival is an *event*. A guest that already existed when we connected never
+    // emitted one to us, so it is in the cast but never arrives on screen (§4.1).
+    const opened = rollup(s, f('text.started', { sessionID: 'child' }, { id: 'e1' }))
+    const closed = rollup(opened.state, f('text.ended', { sessionID: 'child' }, { id: 'e2' }))
+    expect(closed.beats.map(b => b.kind)).toEqual(['says'])
+    expect(closed.beats[0].sessionID).toBe('child')
+    expect(closed.beats.map(b => b.kind)).not.toContain('guest-arrives')
   })
 
   it('raises episode-opens for a root session we joined, not one per frame', () => {
@@ -248,7 +253,13 @@ import { createRollup, seedRollup, rollup, flush } from '../../src/narrative/rol
 import type { Frame } from '../../src/api/sse'
 
 const seeded = (sessions: { id: string; parentID?: string }[] = [{ id: 'x' }]) =>
-  seedRollup(createRollup(), { sessions, permissions: [] })
+  // The episode's opener is spent here, so each test's expectations are about its own
+  // subject rather than about the opener. The opener riding a run or call beat is
+  // Task 1's behaviour and is tested there.
+  rollup(
+    seedRollup(createRollup(), { sessions, permissions: [] }),
+    { type: 'session.created', data: { sessionID: sessions[0].id }, id: `open-${sessions[0].id}` },
+  ).state
 const f = (type: string, data: unknown = {}, extra: Partial<Frame> = {}): Frame => ({ type, data, ...extra })
 const drive = (st: any, frames: Frame[]) => {
   const beats: any[] = []
@@ -381,6 +392,10 @@ Expected: FAIL — no `thinks`/`says`/`uses-tool` beats are produced yet
 - [ ] **Step 3: Implement**
 
 A run opens on `X.started` **or** on the first `X.delta` when no run is open (`X` ∈ `reasoning`/`text`), and closes on `X.ended`; `flush` closes an open run with the events it has. **The beat is emitted at the close, not the open** — §4.1 gives it a delta count, which cannot be known before then, and §4.2 has template lines appearing as each beat closes. Count only deltas.
+
+**Runs already exist in `rollup.ts`** — Task 1 had to build them because its dedupe test needs an emitted beat id. So **extend** them here rather than re-deriving. And there is **one** `guest-arrives` rule, §4.1's: `session.created` carrying a `parentID`. Task 1 briefly raised an arrival from a seeded child's first frame; that is deleted, because an arrival is an event and a guest that already existed when we connected never emitted one.
+
+**Your test helper spends the episode's opener** before each test, so expectations are about the subject. If a test seeds a root and drives a run without doing that, §4.1's opener clause gives it an extra `episode-opens` beat — which is correct behaviour, not a bug to work around.
 
 Calls: key by the call's `id`. `input.started` carries `name`; `called` and `progress` join an existing call and must **not** create one if the name was never seen (that is the "joined mid-call" case → `tool: 'unknown'`). A `shell.exited` joins via the `progress` metadata's `shellID`, so remember that mapping.
 

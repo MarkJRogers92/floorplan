@@ -99,7 +99,7 @@ on every reconnect, as the floor does (spec §6.3).
 
 | Beat kind | Raised by | Rolled from / closed by |
 |---|---|---|
-| `episode-opens` | first frame of a root session in this episode (created or joined) | — |
+| `episode-opens` | the root's `session.created`, or its `execution.started` when we joined after creation, or the first run or call beat for that root — whichever comes first. A frame that is merely the first we happen to see does not open an episode | — |
 | `human-asks` | `inbox.enqueued`, `item.type: "user"`, on a **root** session | — |
 | `briefing` | the same, on a child session | linked to its call as `guest-arrives` is |
 | `thinks` | `reasoning.started` (or the first `reasoning.delta` if joined mid-run) | closed by that session's `reasoning.ended`; carries the delta count, which may be 0 |

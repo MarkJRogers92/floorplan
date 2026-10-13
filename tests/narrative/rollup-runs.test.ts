@@ -87,14 +87,17 @@ describe('calls join by id', () => {
     expect(beats[0].detail).toEqual({ kind: 'tool-fails', tool: 'write', callID: 'c1' })
   })
 
-  it('joins a shell exit code onto the call', () => {
+  it('joins a non-zero shell exit onto the call as tool-fails, carrying the code', () => {
+    // §4.1 amended by the Task 4 recording: OpenCode reports a non-zero exit as a
+    // tool.success, never a tool.failed. The exit is on the success itself.
     const { beats } = drive(seeded(), [
       f('tool.input.started', { sessionID: 'x', id: 'c1', name: 'bash' }, { id: 'a' }),
       f('tool.progress', { sessionID: 'x', id: 'c1', metadata: { shellID: 'sh1' } }, { id: 'b' }),
       f('shell.exited', { sessionID: 'x', id: 'sh1', exit: 2 }, { id: 'c' }),
       f('tool.success', { sessionID: 'x', id: 'c1' }, { id: 'd' }),
     ])
-    expect(beats[0].detail).toMatchObject({ tool: 'bash', exit: 2 })
+    expect(beats.map(b => b.kind)).toEqual(['tool-fails'])
+    expect(beats[0].detail).toEqual({ kind: 'tool-fails', tool: 'bash', callID: 'c1', exit: 2 })
     expect(beats[0].eventIDs).toEqual(['a', 'b', 'c', 'd'])
   })
 
@@ -117,10 +120,34 @@ describe('calls join by id', () => {
       f('shell.exited', { sessionID: 'x', id: 'sh1', exit: 3 }, { id: 'c' }),
       f('tool.success', { sessionID: 'x', id: 'c1' }, { id: 'd' }),
     ])
-    const toolBeat = beats.find(b => b.kind === 'uses-tool')
+    const toolBeat = beats.find(b => b.kind === 'tool-fails')
     expect(toolBeat).toBeDefined()
     expect(toolBeat!.detail).toMatchObject({ tool: 'bash', exit: 3 })
     expect(toolBeat!.eventIDs).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  it('raises tool-fails from the success frame’s own exit when shell.exited arrives late', () => {
+    // The recorded fixture: tool.success carried metadata.exit 3, and its shell.exited
+    // frame arrived 22 ms after the success. The joined exit alone would miss it.
+    const { beats } = drive(seeded(), [
+      f('tool.input.started', { sessionID: 'x', id: 'c1', name: 'shell' }, { id: 'a' }),
+      f('tool.progress', { sessionID: 'x', id: 'c1', metadata: { shellID: 'sh1' } }, { id: 'b' }),
+      f('tool.success', { sessionID: 'x', id: 'c1', metadata: { exit: 3 } }, { id: 'c' }),
+      f('shell.exited', { id: 'sh1', exit: 3 }, { id: 'd' }),
+    ])
+    expect(beats.map(b => b.kind)).toEqual(['tool-fails'])
+    expect(beats[0].detail).toEqual({ kind: 'tool-fails', tool: 'shell', callID: 'c1', exit: 3 })
+  })
+
+  it('keeps a zero-exit success a uses-tool, carrying exit 0 from the join', () => {
+    const { beats } = drive(seeded(), [
+      f('tool.input.started', { sessionID: 'x', id: 'c1', name: 'shell' }, { id: 'a' }),
+      f('tool.progress', { sessionID: 'x', id: 'c1', metadata: { shellID: 'sh1' } }, { id: 'b' }),
+      f('shell.exited', { id: 'sh1', exit: 0 }, { id: 'c' }),
+      f('tool.success', { sessionID: 'x', id: 'c1' }, { id: 'd' }),
+    ])
+    expect(beats.map(b => b.kind)).toEqual(['uses-tool'])
+    expect(beats[0].detail).toMatchObject({ tool: 'shell', exit: 0 })
   })
 
   it('raises tool-fails for a failed frame that carries no call id', () => {

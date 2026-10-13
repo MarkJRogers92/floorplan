@@ -32,12 +32,25 @@ const inputSessionIDOf = (data: Data): string | undefined => {
 }
 
 /**
- * §4.1 provisional: only `tool.failed` raises `tool-fails` in this slice. Task 4 may
- * amend this one branch (e.g. a non-zero shell exit arriving as `tool.success`) instead
- * of spattering the decision through the joins.
+ * The exit code a tool result reports: the frame's own `metadata.exit` first (always
+ * present at decision time), then the `shell.exited` code joined onto the call.
  */
-export const raisesToolFails = (frameType: string, _frameData: Data, _call?: OpenCall): boolean =>
-  frameType === 'tool.failed'
+const exitCode = (data: Data, call?: OpenCall): number | undefined =>
+  num(metadataOf(data).exit) ?? call?.exit
+
+/**
+ * §4.1, amended by the Task 4 recording: a non-zero shell exit arrives as a
+ * `tool.success` carrying `metadata.exit` — never as `tool.failed` — and its
+ * `shell.exited` frame can arrive *after* the success (22 ms late in the fixture).
+ * So `tool-fails` is raised by `tool.failed` **and** by a `tool.success` whose
+ * reported exit code is non-zero, from either source.
+ */
+export const raisesToolFails = (frameType: string, frameData: Data, call?: OpenCall): boolean => {
+  if (frameType === 'tool.failed') return true
+  if (frameType !== 'tool.success') return false
+  const exit = exitCode(frameData, call)
+  return exit !== undefined && exit !== 0
+}
 
 /**
  * Find the subagent call whose input names this child, if any. Arrivals are linked to
@@ -140,6 +153,7 @@ export function foldCall(params: {
       calls = nextCalls
     }
     const callAt = existing?.at ?? at
+    const exit = exitCode(data, existing)
 
     openEpisode(sessionID) // §4.1: a call beat may be the root's first beat
 
@@ -149,6 +163,7 @@ export function foldCall(params: {
         tool: str(data.name) ?? existing?.tool ?? 'unknown',
       }
       if (callID !== undefined) detail.callID = callID
+      if (exit !== undefined) detail.exit = exit
       beats.push({
         id: beatID(eventIDs, 'tool-fails', sessionID, callAt),
         at: callAt,

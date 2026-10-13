@@ -408,6 +408,12 @@ being built concurrently against it by someone else.** Add `createDesk` and
 you conclude a type genuinely has to change, stop and report it as a concern rather
 than changing it — a change here silently breaks work happening in another branch.
 
+**Amended after review.** A conformance check against spec §6.3 found that the platform
+can hold more than one permission request for a session at a time, so
+`openPermission?: string` becomes `openPermissions: string[]`. This is the one
+sanctioned change to the frozen declarations: the room reads only `status` (and the
+count of desks), so it is unaffected. See the ledger entry for the ruling.
+
 **Interfaces:**
 - Consumes: `Frame` (Task 3)
 - Produces: `type DeskStatus = 'idle' | 'working' | 'waiting-on-you' | 'waiting-on-worker' | 'success' | 'failure'`; `type Desk = { sessionID: string; status: DeskStatus; caption: string; openPermission?: string; waitingOnSibling: boolean }`; `createDesk(sessionID: string): Desk`; `applyFrame(desk: Desk, frame: Frame): Desk`
@@ -1004,7 +1010,16 @@ Expected: FAIL — cannot resolve `../../src/app/floor`
 
 - [ ] **Step 3: Implement `createFloor`, then the page**
 
-`createFloor` owns the registry (Task 8) and exposes the three methods above. `setSnapshot` **replaces** the desk set rather than merging: the snapshot is authoritative for which sessions exist, so a session deleted while we were disconnected disappears and a permission raised during the gap shows. Desks present in both keep the positions they already had. `index.html` holds a full-window `<canvas>` and a small toolbar with a **Replay** button and a file input for a `.jsonl`. `src/main.ts` wires: on load, list running servers' sessions to seed, then stream live; the Replay button runs `replay()` against the chosen file and draws on every frame.
+`createFloor` owns the registry (Task 8) and exposes the three methods above. `setSnapshot` **replaces** the desk set rather than merging: the snapshot is authoritative for which sessions exist, so a session deleted while we were disconnected disappears and a permission raised during the gap shows. Desks present in both keep the positions they already had.
+
+**`createFloor` also settles terminal states** (spec §6.3). After a short hold, a desk in
+`success` or `failure` returns to the session's underlying state, which may be `needs
+you` again. The reducer cannot do this — it has no timers, and in a real recording
+`session.execution.succeeded` is routinely the last frame a session ever emits, so a
+desk left to the next frame sits on `success` forever. **This needs its own test**: drive
+a success frame, wait out the hold with fake timers, and assert the desk returns to
+`working` or `waiting-on-you`. Nothing else in the suite can catch its absence, because
+the failure mode is silence. `index.html` holds a full-window `<canvas>` and a small toolbar with a **Replay** button and a file input for a `.jsonl`. `src/main.ts` wires: on load, list running servers' sessions to seed, then stream live; the Replay button runs `replay()` against the chosen file and draws on every frame.
 
 **The page cannot read the service file itself.** `src/api/service.ts` is Node-only (`node:fs`/`node:os`/`node:path`) and a browser has no filesystem access, so `vite.config.ts` mounts `createServiceHandler(readService)` at `GET /__service` inside the dev server it already runs, and the page fetches that route for `{url, password}`. `createServiceHandler` calls the injected reader, answers `200` with the JSON or `404` with `{error}`, and never logs the password. Comment in the code that this route is a development aid and a shippable build will need a real credential path. If the route 404s, the page shows its message in the toolbar rather than a blank canvas.
 

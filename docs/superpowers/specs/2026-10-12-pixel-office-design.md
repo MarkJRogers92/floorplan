@@ -169,9 +169,9 @@ session's state does not depend on how we happened to learn about it.
 | `session.text.delta` | working |
 | `session.compaction.*` | working, caption "compacting" |
 | `permission.asked`, `form.created` | **waiting — needs you** |
-| `session.inbox.*` | waiting, caption "waiting on another worker" |
-| `session.execution.succeeded` | success, then idle after a short hold |
-| `session.execution.failed` / `.interrupted` | failure, then idle |
+| `session.inbox.enqueued` | waiting, caption "waiting on another worker" — `.delivered` and `.cancelled` end that wait |
+| `session.execution.succeeded` | success, then settled by the caller |
+| `session.execution.failed` / `.interrupted` | failure, then settled by the caller |
 | `session.created` / `.deleted` | desk appears / is removed |
 
 Two states must never collapse into one: **"needs you"** and **"waiting on another
@@ -187,10 +187,22 @@ comment; a worker blocked on a sibling is not a worker that needs you.
   the prompt in the TUI instead of our rail, and the event arrives either way. Write
   the clear path against the event, never against the UI action.
 - **"Needs you" outranks "waiting on another worker."** If both hold, show "needs
-  you"; the sibling wait is still true underneath and shows again once the prompt is
-  answered.
-- **Success and failure are transient.** They hold briefly and then fall back to the
-  session's underlying state, which may be "needs you" again.
+  you"; the sibling wait is still true underneath and returns once the prompt is
+  answered — unless an activity frame has meanwhile put the desk back to `working`,
+  which is correct, because it is working.
+- **A desk tracks every open request, not just the first.** The platform can hold more
+  than one request for a session and surface them one at a time. A desk that remembered
+  only the first would clear itself when that one was answered while a second was still
+  unanswered — the exact sticking this section exists to prevent. If OpenCode re-emits
+  `permission.asked` when a queued request becomes active then a single-slot field would
+  happen to work; a list is correct either way and removes the question.
+- **Success and failure are settled by the caller, not by the reducer.** The reducer
+  holds them and has no timers, so nothing inside it can clear a terminal state — and
+  nothing else will either, because in a real recording `session.execution.succeeded` is
+  routinely the last frame a session ever emits, which would leave a desk sitting on
+  `success` forever. The wiring layer settles it: a short hold, then back to the
+  session's underlying state, **which may be "needs you" again**. That settle needs its
+  own test, because a reducer-only suite cannot detect its absence — the bug is silence.
 - **Unknown event types are no-ops, never errors** (§7 R2).
 
 ### 6.4 Two rendering planes

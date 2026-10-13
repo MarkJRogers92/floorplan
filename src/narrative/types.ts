@@ -26,7 +26,7 @@ export type BeatKind =
 /** §6's `BeatDetail`, verbatim. */
 export type BeatDetail =
   | { kind: 'thinks' | 'says'; deltas: number; endedEventID?: string }
-  | { kind: 'uses-tool' | 'tool-fails'; tool: string | 'unknown'; callID: string; path?: string; exit?: number }
+  | { kind: 'uses-tool' | 'tool-fails'; tool: string | 'unknown'; callID?: string; path?: string; exit?: number }
   | { kind: 'guest-arrives' | 'guest-leaves' | 'briefing'; childSessionID: string; callID?: string }
   | { kind: 'knocks'; requestID: string }
   | { kind: 'answered'; reply: string }
@@ -60,7 +60,10 @@ export type SessionInfo = {
   parentID?: string
   agent?: string
   model?: string
-  /** True once this session's arrival beat has been raised, so it is raised exactly once. */
+  /**
+   * True once this session has made its narrative debut: a root's episode has opened,
+   * or a child's `guest-arrives` has been raised. Prevents duplicate arrivals/openers.
+   */
   arrived?: boolean
 }
 
@@ -87,6 +90,8 @@ export type OpenCall = {
   callID: string
   at: number
   tool?: string
+  /** For subagent calls: the child session id passed in the call's input. */
+  inputSessionID?: string
   eventIDs: string[]
   shellID?: string
   exit?: number

@@ -357,14 +357,21 @@ type Beat    = { id: string;        // `b:<first event id>`; BeatKind = the kind
                  at: number;        // `created` of the beat's first event (run start)
                  eventIDs: string[]; kind: BeatKind; sessionID: string; detail: BeatDetail }
 type BeatDetail =
-  | { kind: 'thinks' | 'says'; deltas: number; endedEventID?: string }
+  | { kind: 'thinks' | 'says'; deltas: number; endedEventID?: string; text?: string }
   | { kind: 'uses-tool' | 'tool-fails'; tool: string | 'unknown'; callID?: string;
       path?: string; exit?: number }
   | { kind: 'guest-arrives' | 'guest-leaves' | 'briefing'; childSessionID: string; callID?: string }
   | { kind: 'knocks'; requestID: string } | { kind: 'answered'; reply: string }
   | { kind: 'retry'; attempt: number } | { kind: 'cut'; reason: string }
-  | { kind: 'silence'; fromEventID: string; toEventID: string }
+  | { kind: 'silence'; fromEventID: string; toEventID: string; ms: number }
   | { kind: 'episode-opens' | 'human-asks' | 'memory-wipe' | 'wrap' }
+
+`text` is the ended run's own words, captured verbatim from the closing frame, and is
+what `{quote:}` renders; absent on scrubbed or text-less runs, in which case a
+quote-only line is rejected rather than rendered blank. `ms` is the silence's own gap
+in milliseconds, computed from its two bounding frames at raise time, and is what
+`{gap:}` renders. Both fields were added building slice 1; the table above is now the
+authority, not the earlier prose that omits them.
 ```
 
 `Beat.line` from ruling 12 is dropped: a beat's narration is its **template line**, a

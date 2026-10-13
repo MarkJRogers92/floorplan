@@ -132,7 +132,10 @@ step's beats); `shell.created`/`.exited` (exit code)/`.deleted`; `inbox.delivere
 `provider.updated`, `model.updated`, `server.connected`, heartbeats; any unknown type (R2).
 
 **Beat identity.** `b:<first event id>`, so a re-run yields the same ids. A beat
-records **all** its event ids: a `thinks` of 317 deltas cites 317.
+records **all** its event ids: a `thinks` of 317 deltas cites 317. When an
+`episode-opens` rides a beat the root produced, it takes the id of the frame that
+*produced* that beat rather than the beat's own first frame — an opener and its beat
+must never share an id, because citing is by id and two beats with one id break it.
 
 **`tool-fails` probably misses real failures.** A non-zero shell exit may arrive as
 `tool.success`, and this recording has no failure to check. Before building, record

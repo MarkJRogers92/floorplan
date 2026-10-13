@@ -1,10 +1,14 @@
 # The narrative layer — design
 
-2026-10-12 · status: draft, revision 2 — for owner review · designed against a real recording
+2026-10-12 · status: draft, revision 3 — for owner review · designed against a real recording
 
-Revision 2 answers a review. The thesis is unchanged; the honesty rule is now
-enforced by code wherever text reaches a screen, the rollup is specified tightly
-enough to build, and the owner's decisions are listed as decisions (§12).
+Revision 2 answered a review: the honesty rule became enforced by code wherever text
+reaches a screen, the rollup was specified tightly enough to build, and the owner's
+decisions were listed as decisions (§12). Revision 3 applies the owner's first ruling
+on it, after reading two sample scripts: *"take more creative liberties to make a
+more coherent scene. It doesn't have to make things up per se, but it can create
+narratives."* So the rule splits into two layers — **invent the story, never the
+work** (§1, §5.1).
 
 ## 1. What this is
 
@@ -15,32 +19,37 @@ script/narrative that runs while the work is going; each project or chat can be 
 episode."* Later, the same script is staged as a pixel-art sitcom on the floor.
 
 The rule that cannot bend: **every narrative line carries the id of the event it
-describes. The narration frames and never invents.** Every string any renderer
-shows traces back through one chain:
+describes, and nothing about the work is invented.** What was done, in what order,
+with what outcome, at what count and cost, and anything shown as a worker's own
+words, comes from the footage. **The story around the work may be invented**: why a
+character did it, how it felt, who resents whom, what was said in the room. The
+owner's words: it can create narratives without making things up. Every string any
+renderer shows still traces back through one chain:
 
 ```
 line ──cites──► beats ──rolled from──► event ids ──► raw frames
 ```
 
-## 2. The proposed format: a mockumentary, because the rule demands one
+## 2. The format: a docudrama sitcom — "based on a true story"
 
-A sitcom writer can invent anything. A documentary crew can only film what happened.
-The comedy in *The Office* or *Parks and Recreation* does not come from inventing
-events. It comes from **the edit**: what the camera lingers on, what gets cut against
-what, the pause before the reveal, the callback.
+Revision 2 proposed a pure mockumentary: a crew that can only film what happened,
+comedy only from the edit. The owner read a script in that style and wanted more:
+scenes that hang together, characters with reasons. That is the docudrama's bargain,
+and every "based on a true story" film makes it — **the events are the record; the
+scenes between them are written.**
 
-That is exactly the latitude the non-negotiable leaves. So the proposal is:
+- **The footage** is the event stream. No action, outcome or count appears that did
+  not happen, and code fills every one of them in (§5.1).
+- **The edit** is the rollup and the Director: selection, juxtaposition, timing.
+- **The story** is the Director's to write: motive, feeling, rivalry, office
+  politics, dialogue that dramatises a real exchange (a briefing becomes "Sit down.
+  It's about the dot."). One invented motive per character is what turns a list of
+  events into a plot — pride explains a needless flourish; fairness explains a long
+  deliberation; rivalry explains a permission request.
+- **The workers' own voices** remain the best material: their real words, verbatim,
+  rendered as real (§5.1), cut against what they did next.
 
-- **The footage** is the event stream. Nothing happens on screen that did not happen.
-- **The edit** is the rollup and the Director: selection, ordering, juxtaposition,
-  timing, the cut to black. The jokes live here, and none of it is invention.
-- **The workers' own voices.** The stream carries what workers actually said. Their
-  own words cut against what they did next is the best joke available, and free (§5.4).
-- **The narrator** is deadpan. Every checkable thing it says is filled in by code
-  from the footage (§5.1); the narrator supplies only attitude.
-
-An AI sitcom whose house style *is* its honesty rule. Format and tone are the owner's
-call (§12, D1), best settled by evidence (§11, step 2).
+Tone within that format is still the owner's call (§12, D1).
 
 ## 3. What a real session actually looks like
 
@@ -158,9 +167,15 @@ claim as text**: it writes a template, and code fills each slot from the cited b
 ```ts
 type Line = { id: string; speaker: 'narrator' | CastID;
               template: string;   // free text plus {slots}: "{agent:b7} runs {tool:b7}, {again:b4,b7}."
-              cites: string[];    // beat ids; at least one
+              cites: string[];    // beat ids; at least one — story lines too: they dramatise a moment
               flashback?: true }  // permits breaking time order (§5.2)
 ```
+
+A line whose template is exactly one `{quote:…}` slot is **real speech** and renders
+as such (verbatim, marked). Any other line a character speaks is **dramatised** and
+renders visibly differently — the viewer can always tell what was really said from
+what was written for the scene. The renderer decides from the template; the Director
+cannot label a line real.
 
 The slot vocabulary is closed. Each slot names the beats it reads; the checker
 resolves it from their events or rejects the line.
@@ -187,14 +202,31 @@ any known tool, agent or model name or its verb form (*writes*, *reads*), or any
 path-shaped. Absence is the trap: "it never ran the tests" is a claim about every
 event in the episode, banned unless `{never:…}` proves it.
 
-**The voice/fact boundary is a closed list.** Free text carries attitude, metaphor
-and timing, nothing else. Three tempting, unprovable claims — a worker's **motive**,
-**what the Human was doing**, **clock time** — may appear only after `{hedge}`, which
-renders visibly (*presumably*); otherwise they are rejected.
+**Two layers: the work and the story.** The lint above guards the **work** — every
+action, tool, file, count, order, outcome, duration and cost is a slot or nothing.
+Free text is the **story**, and since revision 3 it is wide open: a worker's
+**motive**, **feelings**, **relationships**, **what the Human was doing**, and
+**dialogue that dramatises a cited moment** need no hedge. The story has three limits,
+each enforced:
 
-The first draft offered this as acceptable; the checker must reject it: *"Build
-thought about it for 317 deltas, which is a lot of deltas for a semicolon."*
-"Semicolon" asserts what the change was, and nothing cited says so.
+1. **It never asserts work.** The lint applies to dramatised dialogue too: a
+   character may say "Sit down. It's about the dot," but not "I ran the tests twice"
+   — that is a count and an action, so it must be a slot.
+2. **It never contradicts the work.** A story line cites the beats it dramatises
+   (§5.2), and may not imply an outcome other than theirs: no relief after a `cut`, no
+   triumph over a `tool-fails` the scene does not show. The Director's instructions
+   carry this; the scene check enforces the mechanical half (outcome words are slots).
+3. **It is never passed off as real speech.** Only `{quote:}` renders as the worker's
+   own words (above).
+
+Clock time stays on the work side: "before lunch" asserts when something happened,
+so it is a `{dur:}`/`created` slot or nothing.
+
+The first draft offered this as acceptable; it is still rejected under revision 3:
+*"Build thought about it for 317 deltas, which is a lot of deltas for a semicolon."*
+"Semicolon" asserts what the change was — work, not story — and nothing cited says so.
+By contrast, *"It could have let the dot go. Instead, it gave the dot a name"* passes:
+the renaming is cited, and *could have let it go* is the story's.
 
 A failing line is **dropped, never repaired** — a missing joke costs nothing; a wrong
 one breaks the premise.
@@ -211,6 +243,8 @@ a scene passes only if:
    previous line's, unless marked `flashback`, which renders as one.
 4. **No burying.** Every `tool-fails`, `cut` and `knocks` beat is cited by a surviving
    line, or the scene falls back to templates.
+5. **Story stays in the room.** A dramatised line is spoken only by a character whose
+   session the scene cites; nobody gets dialogue in a scene they were not in.
 
 **Why these exist:** the first draft's cold-open sketch failed them. It stitched S0's
 317-delta think to S1's tools as one named actor, without evidence for the name, and
@@ -257,14 +291,11 @@ Each comes from material the stream really carries.
 | **The episode title** | A `Line` over the episode's own slots: "The One With {count:shell,b1..b90}." |
 
 **Footage contradicts talking head** — the first draft's favourite device — needed a
-talking head that says something false. That is an owner decision (§12, D3):
-
-- **(a) Quote, don't generate.** Talking heads are the worker's real words
-  (`text.ended`/`reasoning.ended`), cut against what it then did. Truer to HANDOFF's
-  "two voices", no model call, and any contradiction is real. **Recommended.**
-- **(b) Framed opinion.** A model writes it; characters may be wrong only inside
-  visibly framed opinion ("I think that went well"). Funnier on demand; risks
-  reading as the product lying.
+talking head that says something false. Revision 3 settles it (D3) as both, kept
+apart by rendering: **talking heads to camera are the worker's real words**
+(`{quote:}` of `text.ended`/`reasoning.ended`), cut against what it then did, so any
+contradiction is real; **in-scene dialogue is dramatised** and may carry a
+character's pride, doubt or denial, rendered as dramatised, never as a quote.
 
 ### 5.5 The cast, and continuity
 
@@ -277,7 +308,12 @@ talking head that says something false. That is an owner decision (§12, D3):
 - **Unidentified.** Any session whose agent is unknown (S0 here).
 - **The Human.** Never on screen; present through `human-asks`, `knocks` and
   `answered`. Whether the Human is a character at all is the owner's call (D5).
-- **The Narrator.** Deadpan. Knows only the footage.
+- **Personas** (story layer, revision 3). Alongside the computed bible, each recurring
+  character gets an invented personality — the keen intern, the fair-minded foreman,
+  the weary auditor — written once by the Director from its first episodes, stored
+  with the series, and reused so the character is the same person next week. A
+  persona is story: it may colour any line, but it never stands in for a bible fact.
+- **The Narrator.** Deadpan, and allowed an inner life of its own. Its facts are slots.
 
 **"Previously on…"** is a scene of ordinary lines citing `episodeID/beatID`. The
 series store keeps past episodes' beats and event ids, so a recap is checked like a
@@ -396,7 +432,9 @@ data-path agent's files, so this is reported, not changed; it is additive.
 
 1. `Frame` keeps `created` and `location`; re-record (§9).
 2. **Hand-write two or three short scripts** from one real recording in different
-   tones, obeying §5 by hand; the owner picks. Settles tone with evidence, no code.
+   tones, obeying §5 by hand; the owner picks. *Begun:* two versions of one episode
+   were shown to the owner (not committed — they quote the recording); the
+   mockumentary read as too dry, the docudrama version led to revision 3.
 3. `rollup` + golden tests.
 4. Template lines as a script beside the floor — already followable, and it proves
    the citing chain end to end.
@@ -407,12 +445,14 @@ this design cannot recover from.
 
 ## 12. Owner decisions
 
-- **D1. Format and tone.** Mockumentary is a proposal. Deadpan, broader (*Brooklyn
-  Nine-Nine*) or drier (*The Thick of It*, minus the swearing)? Decide from §11 step 2.
+- **D1. Format and tone.** *Format settled (rev. 3):* docudrama — real work, written
+  story. *Tone still open:* the docudrama sample was deadpan-warm; broader (*Brooklyn
+  Nine-Nine*) or drier (*The Thick of It*, minus the swearing)?
 - **D2. What an episode is.** The owner said "project **or** chat". Proposed: project
   = series, chat = episode; or project = episode. A chat resumed after a gap: same
   episode, or "Part 2"?
-- **D3. Talking heads:** real quotes (a) or framed opinion (b) (§5.4).
+- **D3. Talking heads.** *Settled (rev. 3):* real quotes to camera; dramatised
+  dialogue in scene, rendered distinctly (§5.4).
 - **D4. Ruling 14** amendment (§10.2).
 - **D5. The Human:** an unseen character, a named one, or not a character at all.
 - **D6. Model calls:** where they run, which key, which model, what budget (§8).

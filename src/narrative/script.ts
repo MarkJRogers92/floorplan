@@ -34,7 +34,10 @@ export function assembleScript(
   ctx: ScriptCtx,
   templateFor: TemplateFor = defaultTemplateFor,
 ): ScriptLine[] {
-  const index = new Map(beats.map(beat => [beat.id, beat]))
+  // The map is the evidence map, not the beats being narrated: `renderLine` takes its
+  // order from `ctx.beats`, and an id in that order with no entry here makes `{never:}`
+  // throw and a range slot silently undercount — a false count, which §5.1 forbids.
+  const index = new Map(ctx.beats.map(beat => [beat.id, beat]))
   const script: ScriptLine[] = []
   for (const beat of beats) {
     const line = templateFor(beat, ctx)

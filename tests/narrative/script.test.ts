@@ -59,6 +59,23 @@ describe('assembleScript', () => {
         : { id: `ok-${beat.id}`, speaker: 'narrator', template: 'Something happened.', cites: [beat.id] })
     expect(out.map(l => l.beatIDs)).toEqual([['b:1'], ['b:3']])
   })
+
+  it('proves a slot from the whole evidence map, not only from the beats being narrated', () => {
+    // The page narrates one beat at a time: `assembleScript([beat], ctx)` with `ctx.beats`
+    // holding the whole episode. A cross-beat slot must resolve from that evidence, or
+    // `{count:}` silently undercounts — the one failure §5.1 cannot recover from.
+    const evidence = [
+      b('b:1', 'uses-tool', { kind: 'uses-tool', tool: 'read', callID: 'c1' }, 0),
+      b('b:2', 'uses-tool', { kind: 'uses-tool', tool: 'read', callID: 'c2' }, 1000),
+    ]
+    const out = assembleScript([evidence[0]!], { cast: () => 'build', beats: evidence }, beat => ({
+      id: 'l',
+      speaker: 'narrator',
+      template: `{count:uses-tool,${beat.id}..b:2} calls.`,
+      cites: [beat.id, 'b:2'],
+    }))
+    expect(out.map(l => l.text)).toEqual(['2 calls.'])
+  })
 })
 
 describe('sceneHeadingFor', () => {
